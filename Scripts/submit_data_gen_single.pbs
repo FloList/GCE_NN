@@ -1,0 +1,13 @@
+#!/bin/bash 
+
+#PBS -P u95       
+#PBS -l walltime=04:59:59
+#PBS -N GCE_gen_data
+#PBS -l mem=64GB                   
+#PBS -l ncpus=24
+#PBS -q normal                     
+
+cd $PBS_O_WORKDIR                                          
+source ~/.bashrc 
+
+python3 generate_data_per_model.py ${JOB_ID}

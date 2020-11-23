@@ -1,0 +1,24 @@
+#!/bin/bash 
+
+#PBS -P u95       
+#PBS -l walltime=03:00:00
+#PBS -N NPTFit
+#PBS -l mem=128GB                   
+#PBS -l ncpus=32
+#PBS -q normal                     
+
+source ~/.bashrc
+cd $PBS_O_WORKDIR
+
+module purge
+module load hdf5/1.10.5p python3/3.7.4 openmpi/4.0.1 gsl/2.6
+
+export LD_LIBRARY_PATH=/apps/gsl/2.6/lib:/apps/intel-ct/2020.0.166/compiler/lib:/apps/openmpi/4.0.1/lib:/apps/openmpi/4.0.1/lib/profilers:/apps/python3/3.7.4/lib:/apps/intel-ct/2019.3.199/mkl/lib/intel64:/apps/hdf5/1.10.5p/lib::/scratch/u95/fl9575/MultiNest/lib:/home/562/fl9575/FFTW/fftw-2.1.5/build/lib/:/scratch/u95/fl9575/MultiNest/lib:/home/562/fl9575/FFTW/fftw-2.1.5/build/lib/
+
+export LD_PRELOAD=/apps/intel-ct/2020.0.166/mkl/lib/intel64/libmkl_avx512.so:/apps/intel-ct/2020.0.166/mkl/lib/intel64/libmkl_def.so:/apps/intel-ct/2020.0.166/mkl/lib/intel64/libmkl_avx2.so:/apps/intel-ct/2020.0.166/mkl/lib/intel64/libmkl_core.so:/apps/intel-ct/2020.0.166/mkl/lib/intel64/libmkl_intel_lp64.so:/apps/intel-ct/2020.0.166/mkl/lib/intel64/libmkl_intel_thread.so:/apps/intel-ct/2020.0.166/compiler/lib/libiomp5.so
+
+export PYTHONPATH=/home/562/fl9575/Pylians3/library/build/lib.linux-x86_64-3.7:/scratch/u95/fl9575/NPTFit/NPTFit:/scratch/u95/fl9575/NPTFit/build:/scratch/u95/fl9575/NPTFit-Sim/NPTFit-Sim:/scratch/u95/fl9575/MultiNest/lib:/scratch/u95/fl9575/PythonPackages:/scratch/u95/fl9575/NPTFit/:/home/562/fl9575/Pylians3/library/build/lib.linux-x86_64-3.7:/scratch/u95/fl9575/NPTFit:/scratch/u95/fl9575/NPTFit/NPTFit:/scratch/u95/fl9575/NPTFit/build:/scratch/u95/fl9575/NPTFit-Sim/NPTFit-Sim:/scratch/u95/fl9575/MultiNest/lib:/scratch/u95/fl9575/PythonPackages
+
+mpirun -n 32 python3 fit_Fermi_counts_p6v11.py
+
+

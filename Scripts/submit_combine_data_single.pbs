@@ -1,0 +1,32 @@
+#!/bin/bash 
+
+#PBS -P u95       
+#PBS -l walltime=02:59:59
+#PBS -N GCE_combine
+#PBS -l mem=64GB                   
+#PBS -l ncpus=24
+#PBS -q normal                     
+
+cd $PBS_O_WORKDIR                                          
+source ~/.bashrc 
+
+nfiles_train=2400
+nfiles_test=10
+ncpus=24
+files_per_cpu_train=$((nfiles_train/ncpus))
+
+for value in {0..23}
+do
+    # CPU 0 combines the test data in addition
+    if [ ${value} == 0 ]
+    then
+        start_test=0
+        end_test=$((nfiles_test-1))
+    else
+        start_test=0
+        end_test=-1
+    fi
+    python3 ${script} ${value} $((value*files_per_cpu_train)) $(((value+1)*files_per_cpu_train-1)) ${start_test} ${end_test} &
+done
+
+wait
