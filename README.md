@@ -20,6 +20,10 @@ This implementation borrows code from:
 * https://github.com/deepsphere/paper-deepsphere-iclr2020/blob/51260d9169b9bff2f0d71d567c99909a17efd5e9/figures/kernel_widths.py
 * https://github.com/yaringal/ConcreteDropout
 * https://github.com/bsafdi/NPTFit/tree/master/examples
+* https://github.com/facebookresearch/SingleModelUncertainty/blob/master/aleatoric/regression/joint_estimation.py
+* https://github.com/master/nima/blob/master/nima.py
+* https://github.com/luke321321/portfolio/blob/master/climbing/CNN.ipynb
+* https://www.tensorflow.org/probability/examples/FFJORD_Demo
 
 In particular, the neural network architecture is built on *DeepSphere* ([Perraudin et al. 2019](http://arxiv.org/abs/1810.12186), [Defferrard et al. 2020](https://openreview.net/pdf?id=B1e3OlStPB)).
 
