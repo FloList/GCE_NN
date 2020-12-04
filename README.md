@@ -40,5 +40,23 @@ An experimental U-Net implementation for the pixelwise regression is also includ
 ![Fermi_results](https://github.com/FloList/GCE_NN/blob/main/pngs/Predictions_for_Fermi.png)
 An interactive version of this plot is available [here](https://zenodo.org/record/4044689/).
 
+## Citation
+```
+@article{GCE_NN,
+abstract = {A fundamental question regarding the Galactic Center Excess (GCE) is whether the underlying structure is point-like or smooth. This debate, often framed in terms of a millisecond pulsar or annihilating dark matter (DM) origin for the emission, awaits a conclusive resolution. In this work we weigh in on the problem using Bayesian graph convolutional neural networks. In simulated data, our neural network (NN) is able to reconstruct the flux of inner Galaxy emission components to on average $\sim$0.5%, comparable to the non-Poissonian template fit (NPTF). When applied to the actual $\textit{Fermi}$-LAT data, we find that the NN estimates for the flux fractions from the background templates are consistent with the NPTF; however, the GCE is almost entirely attributed to smooth emission. While suggestive, we do not claim a definitive resolution for the GCE, as the NN tends to underestimate the flux of point-sources peaked near the 1$\sigma$ detection threshold. Yet the technique displays robustness to a number of systematics, including reconstructing injected DM, diffuse mismodeling, and unmodeled north-south asymmetries. So while the NN is hinting at a smooth origin for the GCE at present, with further refinements we argue that Bayesian Deep Learning is well placed to resolve this DM mystery.},
+archivePrefix = {arXiv},
+arxivId = {2006.12504},
+author = {List, Florian and Rodd, Nicholas L. and Lewis, Geraint F. and Bhat, Ishaan},
+eprint = {2006.12504},
+file = {:home/flo/Documents/Literature/GCE/2006.12504.pdf:pdf},
+journal = {preprint (arXiv:2006.12504)},
+mendeley-groups = {GCE},
+month = {jun},
+title = {{The GCE in a New Light: Disentangling the $\gamma$-ray Sky with Bayesian Graph Convolutional Neural Networks}},
+url = {http://arxiv.org/abs/2006.12504},
+year = {2020}
+}
+```
+
 
 
