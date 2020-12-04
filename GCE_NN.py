@@ -49,7 +49,7 @@ class GCE_NN():
         self.HPC = HPC
         self.parse_params()
         self.params_orig = copy(self.__dict__)
-        for key in ["path_to_load", "NN_type", "HPC"]:
+        for key in ["path_to_load", "HPC"]:
             del self.params_orig[key]
 
         # Define the attributes that are to be defined later
@@ -382,6 +382,7 @@ class GCE_NN():
                                                     rescale=rescale_fermi_counts, indices=self["indexes"][0],
                                                     outer_mask=self["ROI_fermi"], mask_3FGL=self["mask_3FGL_fermi"],
                                                     nside=nside_fermi_counts, remove_exp=self["remove_exp"])
+
 
     def build_model(self):
         """
