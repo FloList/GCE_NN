@@ -1,5 +1,5 @@
 # GCE NN
-This is the Tensorflow implementation of the paper "The GCE in a New Light: Disentangling the γ-ray Sky with Bayesian Graph Convolutional Neural Networks" by Florian List, Nicholas L. Rodd, Geraint F. Lewis, Ishaan Bhat ([arXiv:2006.12504](https://arxiv.org/abs/2006.12504), accepted by *Phys. Rev. Lett.*).
+This is the Tensorflow implementation of the paper "The GCE in a New Light: Disentangling the γ-ray Sky with Bayesian Graph Convolutional Neural Networks" by Florian List, Nicholas L. Rodd, Geraint F. Lewis, Ishaan Bhat ([arXiv:2006.12504](https://arxiv.org/abs/2006.12504), [Phys. Rev. Lett. 125, 241002](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.241102)).
 
 ![NN_sketch](https://github.com/FloList/GCE_NN/blob/main/pngs/NN_sketch.png)
 
@@ -42,18 +42,17 @@ An interactive version of this plot is available [here](https://zenodo.org/recor
 
 ## Citation
 ```
-@article{GCE_NN,
-abstract = {A fundamental question regarding the Galactic Center Excess (GCE) is whether the underlying structure is point-like or smooth. This debate, often framed in terms of a millisecond pulsar or annihilating dark matter (DM) origin for the emission, awaits a conclusive resolution. In this work we weigh in on the problem using Bayesian graph convolutional neural networks. In simulated data, our neural network (NN) is able to reconstruct the flux of inner Galaxy emission components to on average $\sim$0.5%, comparable to the non-Poissonian template fit (NPTF). When applied to the actual $\textit{Fermi}$-LAT data, we find that the NN estimates for the flux fractions from the background templates are consistent with the NPTF; however, the GCE is almost entirely attributed to smooth emission. While suggestive, we do not claim a definitive resolution for the GCE, as the NN tends to underestimate the flux of point-sources peaked near the 1$\sigma$ detection threshold. Yet the technique displays robustness to a number of systematics, including reconstructing injected DM, diffuse mismodeling, and unmodeled north-south asymmetries. So while the NN is hinting at a smooth origin for the GCE at present, with further refinements we argue that Bayesian Deep Learning is well placed to resolve this DM mystery.},
+@article{List_et_al_2020,
 archivePrefix = {arXiv},
 arxivId = {2006.12504},
 author = {List, Florian and Rodd, Nicholas L. and Lewis, Geraint F. and Bhat, Ishaan},
 eprint = {2006.12504},
-file = {:home/flo/Documents/Literature/GCE/2006.12504.pdf:pdf},
-journal = {preprint (arXiv:2006.12504)},
-mendeley-groups = {GCE},
-month = {jun},
-title = {{The GCE in a New Light: Disentangling the $\gamma$-ray Sky with Bayesian Graph Convolutional Neural Networks}},
-url = {http://arxiv.org/abs/2006.12504},
+journal = {Physical Review Letters},
+volume = {125},
+number = {24},
+pages = {241102},
+title = {{Galactic Center Excess in a New Light: Disentangling the γ-Ray Sky with Bayesian Graph Convolutional Neural Networks}},
+url = {https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.241102},
 year = {2020}
 }
 ```
