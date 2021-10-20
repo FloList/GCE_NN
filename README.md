@@ -1,7 +1,7 @@
 # GCE NN
 This is the Tensorflow implementation of the paper "The GCE in a New Light: Disentangling the γ-ray Sky with Bayesian Graph Convolutional Neural Networks" by Florian List, Nicholas L. Rodd, Geraint F. Lewis, Ishaan Bhat ([arXiv:2006.12504](https://arxiv.org/abs/2006.12504), [Phys. Rev. Lett. 125, 241002](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.241102)).
 
-![NN_sketch](https://github.com/FloList/GCE_NN/blob/main/pngs/NN_sketch.png)
+![NN_sketch](https://github.com/FloList/GCE_NN/blob/prl/pngs/NN_sketch.png)
 
 *Author*: Florian List (Sydney Institute for Astronomy, School of Physics, A28, The University of Sydney, NSW 2006, Australia).
 
@@ -37,7 +37,7 @@ For including PSs, the script ```generate_data_per_model.py``` in the folder ```
 An experimental U-Net implementation for the pixelwise regression is also included (the hyperparameters must be specified in the file ```parameters_UNet.py```), but has not been tested properly. Also, many options (in particular for the estimation of uncertainties) have not been fully implemented, yet, and not all combinations of hyperparameters / settings are supported. This github repo contains the current state of our neural network implementation and does not represent an official code release.
 
 ## Results for the *Fermi* map:
-![Fermi_results](https://github.com/FloList/GCE_NN/blob/main/pngs/Predictions_for_Fermi.png)
+![Fermi_results](https://github.com/FloList/GCE_NN/blob/prl/pngs/Predictions_for_Fermi.png)
 An interactive version of this plot is available [here](https://zenodo.org/record/4044689/).
 
 ## Citation
