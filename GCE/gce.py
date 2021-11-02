@@ -42,6 +42,7 @@ class Analysis:
         self._trainable_weights_dict = {}
         self.set_plot_defaults()
         self._strategy = tf.distribute.MirroredStrategy()
+        self._gce_module_folder = os.path.dirname(os.path.abspath(__file__))
         print('Number of devices: {}'.format(self._strategy.num_replicas_in_sync))
 
     def load_params(self, param_src, int_flag=0, overwrite=False):

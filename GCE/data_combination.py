@@ -154,8 +154,8 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
         "Training and testing dictionaries have different keys!"
 
     exp = np.unique(np.asarray([settings_dict[key]["exp"] for key in [*train_files_dict]]), axis=0).squeeze()
-    mean_exp = np.mean(exp)
-    rescale = exp / mean_exp
+    rescale_compressed = np.unique(np.asarray([settings_dict[key]["rescale_compressed"]
+                                               for key in [*train_files_dict]]), axis=0).squeeze()
 
     # Get number of files
     n_files_train = len(train_files_dict[files_dict_no_add_two[0]])
@@ -225,7 +225,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                             temp_dict[temp] = settings_dict[temp][key]
                     settings_dict_comb[key] = temp_dict
                 settings_dict_comb["exp"] = exp
-                settings_dict_comb["rescale"] = rescale
+                settings_dict_comb["rescale_compressed"] = rescale_compressed
                 settings_dict_comb["nside"] = nside
                 indices_roi_all = np.asarray([settings_dict[temp]["indices_roi"] for temp in t_p + t_ps])
                 indices_roi_unique = np.unique(indices_roi_all, axis=0)

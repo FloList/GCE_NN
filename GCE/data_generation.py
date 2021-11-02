@@ -53,14 +53,14 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
     save_example_plot = n_example_plots > 0
 
     exp = temp_dict["exp"]
-    rescale = temp_dict["rescale"]
+    rescale_compressed = temp_dict["rescale_compressed"]
 
     # Set output dtypes
     dtype_data = np.uint32 if do_poisson_scatter_p else np.float32  # without Poisson draw, counts are non-integer
     dtype_flux_arr = np.float32
 
     # Set a random seed for numpy (using random because numpy duplicates random number generator for multiple processes)
-    random_seed = random.randint(0, int(2**32 - 1))
+    random_seed = random.randint(0, int(2 ** 32 - 1))
     np.random.seed(random_seed)
     print("Job ID:", job_id, "Random Seed:", random_seed)
 
@@ -126,7 +126,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                 settings_out["priors"] = prior_dict[temp]
                 settings_out["is_log_A"] = poisson_a_is_log
                 settings_out["exp"] = exp
-                settings_out["rescale"] = rescale
+                settings_out["rescale_compressed"] = rescale_compressed
                 settings_out["indices_roi"] = indices_roi
                 settings_out["format"] = "NEST"
                 settings_out["mask_type"] = mask_type
@@ -282,7 +282,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                 # The following assert is for the scenario where there is leakage INTO and OUT OF the ROI, and n_phot
                 # contains ALL the counts (and only those counts) from PSs within the ROI.
                 assert np.all(sim_maps[:, :, 1].sum(1) == [n_phot[i].sum() for i in range(n_sim_per_chunk)]), \
-                        "Photons counts in maps and n_phot lists are not consistent! Aborting..."
+                    "Photons counts in maps and n_phot lists are not consistent! Aborting..."
 
                 # Collect garbage
                 auto_garbage_collect()
@@ -293,7 +293,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                     settings_out["T"] = t
                     settings_out["priors"] = prior_dict[temp]
                     settings_out["exp"] = exp  # exposure
-                    settings_out["rescale"] = rescale
+                    settings_out["rescale_compressed"] = rescale_compressed
                     settings_out["max_NP_sources"] = np.nan  # not set here
                     settings_out["indices_roi"] = np.argwhere(1 - total_mask_neg).flatten()
                     settings_out["format"] = "NEST"
@@ -333,5 +333,8 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                     multipage(os.path.join(output_path, temp + "_examples.pdf"))
                     plt.close("all")
 
+    dash = 80 * "="
+    print(dash)
     print("Done! Computation took {0} seconds.".format(time.time() - start_time))
+    print(dash)
     # Loading pickle file e.g.: data = pickle.load( open( "./data/<...>.pickle", "rb" ) )

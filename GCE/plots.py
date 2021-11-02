@@ -376,6 +376,7 @@ def plot_histograms(params, true_hists, preds, pdf=False, out_file="hist_plot.pd
         all_figs.append(fig)
         all_axs.append(axs)
 
+    plt.show()
     return all_figs, all_axs
 
 
@@ -423,6 +424,8 @@ def plot_maps(maps, params, out_file="maps.pdf", cmap="rocket_r", plot_inds=None
             ax.text(-params.data["outer_rad"], params.data["outer_rad"], sep_comma(int(np.nansum(maps[sample, :]))),
                     va="top", ha="left")
         axs[i_col, i_row].axis("off")
+
+    plt.show()
 
     if len(out_file) > 0:
         save_folder = params.nn["figures_folder"]

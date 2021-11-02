@@ -61,7 +61,7 @@ def get_params(int_flag=0):
     p_tt["data_name"] = "Example"  # name of data folder for the template maps
     p_tt["filename_base"] = "Maps"  # name basis of template map files
     p_tt["poisson_A_is_log"] = False  # is log10(A) rather than A specified for the Poissonian templates in prior_dict?
-    p_tt["n_chunk"] = int(20)  # number of chunks to compute per job
+    p_tt["n_chunk"] = int(100)  # number of chunks to compute per job
     p_tt["n_sim_per_chunk"] = int(50)  # number of simulations per chunk and per model (one output file per chunk)
     # NOTE: the total number of maps for each template will be "n_chunk" * "n_sim_per_chunk" (* # jobs)
     p_tt["add_two_temps_PS"] = ["iso_PS"]  # list of PS templates for which TWICE the number of maps will be generated.
@@ -85,7 +85,8 @@ def get_params(int_flag=0):
             prior_dict[key][0] /= (p_data["nside"] // 128) ** 2
             prior_dict[key][1] /= (p_data["nside"] // 128) ** 2
 
-    # Priors for PS templates: SCDs modeled as skew normal distributions here TODO: changed to -08 from -07 for testing
+    # Priors for PS templates: SCDs modeled as skew normal distributions here
+    # TODO: Note: changed upper limit -07 -> -08 for testing!
     prior_dict["gce_12_PS"] = {"mean_exp": [-12, -9], "var_exp": 0.25, "skew_std": 3.0,
                                "flux_lims": [0, 1.4e-08], "flux_log": False, "enforce_upper_flux": True}
     prior_dict["thin_disk_PS"] = {"mean_exp": [-12, -9], "var_exp": 0.25, "skew_std": 3.0,

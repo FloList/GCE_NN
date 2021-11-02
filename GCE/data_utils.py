@@ -395,12 +395,12 @@ def split_into_n_and_s(template, nside=128, filename="template"):
     return template_n, template_s
 
 
-def get_fermi_counts(params, indexes_top, rescale=None, only_hemisphere=None):
+def get_fermi_counts(params, indexes_top, rescale_compressed=None, only_hemisphere=None):
     """
     Returns the counts in the Fermi map after the same pre-processing as for the training data.
     :param params: parameter dictionary
     :param indexes_top: indexes of ROI at highest considered resolution
-    :param rescale: rescaling array from counts to flux space
+    :param rescale_compressed: compressed rescaling array from counts to flux space
     :param only_hemisphere: None, "N" (only north) or "S" (only south)
     :return: Processed Fermi counts
     """
@@ -440,7 +440,7 @@ def get_fermi_counts(params, indexes_top, rescale=None, only_hemisphere=None):
     fermi_data = fermi_data[indexes_top]
 
     # Remove exposure correction
-    if rescale is not None and remove_exp:
-        fermi_data = fermi_data / rescale  # rescale (rescale: nest & ROI)
+    if rescale_compressed is not None and remove_exp:
+        fermi_data = fermi_data / rescale_compressed  # rescale (rescale: nest & ROI)
 
     return fermi_data

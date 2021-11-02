@@ -33,8 +33,7 @@ class Dataset(object):
         """
         self._p = params
         self._g = generator
-        rescale_full = self._g.settings_dict["rescale"]
-        rescale_compressed = rescale_full[self._g.settings_dict["indices_roi"]]
+        rescale_compressed = self._g.settings_dict["rescale_compressed"]
         self._rescale_compressed_expanded = np.expand_dims(rescale_compressed, 0)
 
         # Store batch size and prefetch buffer size
@@ -125,6 +124,6 @@ class Dataset(object):
         required_keys = ["gen", "data", "nn"]
         assert np.all([k in self._p.keys() for k in required_keys]), \
             "Missing keys! Required keys: {:}, found keys: {:}".format(required_keys, self._p.keys())
-        rescale = self._g.settings_dict["rescale"]
-        indexes_top = self._g.settings_dict["unmasked_pix"]
-        return get_fermi_counts(self._p, indexes_top=indexes_top, rescale=rescale)
+        indexes_top = self._g.settings_dict["indices_roi"]
+        rescale_compressed = self._g.settings_dict["rescale_compressed"]
+        return get_fermi_counts(self._p, indexes_top=indexes_top, rescale_compressed=rescale_compressed)
