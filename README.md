@@ -14,11 +14,13 @@ The "**main**" branch contains the most up-to-date version, which is under devel
 For any queries, please contact me at florian dot list at univie dot ac dot at.
 
 <p align="center">
-<img src="https://github.com/FloList/GCE_NN/blob/prl/pngs/NN_sketch.png" width="600"/>
+<img src="https://github.com/FloList/GCE_NN/blob/main/pngs/nn_sketch.png" height="200"/>
+&ensp;
+<img src="https://github.com/FloList/GCE_NN/blob/prl/pngs/NN_sketch.png" height="200"/>
 <p/>
 
 **Disclaimer**:
-The code in this repository borrows from several other GitHub repositories and other sources.
+The code in this repository borrows from several other GitHub repositories and other publicly available sources.
 In particular, the neural network architecture is built upon *DeepSphere* ([Perraudin et al. 2019](http://arxiv.org/abs/1810.12186), [Defferrard et al. 2020](https://openreview.net/pdf?id=B1e3OlStPB)).
 
 ## Data
@@ -29,6 +31,8 @@ The *Fermi* dataset and the templates contained in this repository have been gen
  
 The data is made available with the permission of the authors, and everybody using the data for a publication should cite these papers.
 
+(The data selection criteria can be found in arXiv:2107.09070.)
+
 ## Getting started
 First, clone the repository via
 ````
@@ -37,7 +41,11 @@ git clone https://github.com/FloList/GCE_NN.git
 Then, a good starting point is the Jupyter notebook ```gce_nn_example_notebook.ipynb``` in the ```examples``` folder, which performs a convolutional neural network-based analysis of γ-ray photon-count maps for a simple scenario. To consider a different scenario, generate a new parameter file in the ```parameter_files``` folder (for example by copying the file ```parameters.py``` and modifying the relevant settings). 
 
 ## Results for the *Fermi* data (from arXiv:2107.09070)
-* In the *Fermi* data, we find a faint Galactic Center Excess (GCE) described by a median source-count distribution (SCD) peaked at a flux of ~ 4 × 10⁻¹¹ counts / cm² / s (corresponding to ~ 3 - 4 expected counts per PS), which would require N ~ O(10⁴) sources to explain the entire excess (median value N = 29,300 across the sky). 
+<p align="center">
+<img src="https://github.com/FloList/GCE_NN/blob/main/pngs/fermi_plot.png" width="600"/>
+<p/>
+
+* In the *Fermi* data, we find a **faint** Galactic Center Excess (GCE) described by a median source-count distribution (SCD) peaked at a flux of ~ 4 × 10⁻¹¹ counts / cm² / s (corresponding to ~ 3 - 4 expected counts per PS), which would require N ~ O(10⁴) sources to explain the entire excess (median value N = 29,300 across the sky). 
 * Although faint, this SCD allows us to derive the constraint ηₚ ≤ 66% for the Poissonian fraction of the GCE flux ηₚ at 95% confidence, suggesting that a substantial amount of the GCE flux is due to PSs.
 
 ## Citations
