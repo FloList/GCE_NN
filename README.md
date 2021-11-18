@@ -56,13 +56,13 @@ source venv_gce_nn/bin/activate  # activate it
 ````
 or if you are using ```pyenv```
 ```
-pyenv virtualenv 3.8.0 venv_gce_nn
-pyenv activate venv_gce_nn
+pyenv virtualenv 3.8.0 venv_gce_nn  # create the environment
+pyenv activate venv_gce_nn  # activate it
 # pyenv deactivate   # to deactivate the environment
 ```
 or if you are using ```conda```
 ````
-conda create -n venv_gce_nn python=3.8.0 anaconda  # activate it
+conda create -n venv_gce_nn python=3.8.0 anaconda  # create the environment
 conda activate venv_gce_nn  # activate it
 # conda deactivate  # to deactivate the environment
 ````
