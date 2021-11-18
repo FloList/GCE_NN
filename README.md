@@ -27,7 +27,7 @@ In particular, the neural network architecture is built upon *DeepSphere* ([Perr
 The *Fermi* dataset and the templates contained in this repository have been generated for the following papers:
 * *Spurious point source signals in the galactic center excess*, Rebecca K. Leane and Tracy R. Slatyer, *Phys. Rev. Lett.* 125, [121105](https://link.aps.org/doi/10.1103/PhysRevLett.125.121105), 2020
 [[arXiv:2002.12370](http://arxiv.org/abs/2002.12370)].
-* *The enigmatic Galactic Center excess: Spurious point sources and signal mismodeling*, Rebecca K. Leane and Tracy R. Slatyer, *Phys. Rev. D* 102, [063019](https://link.aps.org/doi/10.1103/PhysRevD.102.063019), 2020 [[arXiv:2002.12371](http://arxiv.org/abs/2002.12371)].
+* *The enigmatic Gtensorflow-io-gcs-filesystem==0.22.0alactic Center excess: Spurious point sources and signal mismodeling*, Rebecca K. Leane and Tracy R. Slatyer, *Phys. Rev. D* 102, [063019](https://link.aps.org/doi/10.1103/PhysRevD.102.063019), 2020 [[arXiv:2002.12371](http://arxiv.org/abs/2002.12371)].
  
 The data is made available with the permission of the authors, and everybody using the data for a publication should cite these papers.
 
@@ -38,6 +38,44 @@ First, clone the repository via
 ````
 git clone https://github.com/FloList/GCE_NN.git
 ````
+*Warning*: This github repository is **quite large** (several hundred MBs) because it contains *Fermi* data and templates.
+
+Then, ``cd`` into the directory
+````
+cd GCE_NN
+````
+
+We highly recommend using a new virtual environment for the GCE NN analysis in which all the required packages can be installed 
+in isolation from the globally installed packages.
+
+This can be done using ```venv```
+````
+python3.8 -m venv venv_gce_nn  # create the environment
+source venv_gce_nn/bin/activate  # activate it
+# deactivate   # to deactivate the environment
+````
+or if you are using ```pyenv```
+```
+pyenv virtualenv 3.8.0 venv_gce_nn
+pyenv activate venv_gce_nn
+# pyenv deactivate   # to deactivate the environment
+```
+or if you are using ```conda```
+````
+conda create -n venv_gce_nn python=3.8.0 anaconda  # activate it
+conda activate venv_gce_nn  # activate it
+# conda deactivate  # to deactivate the environment
+````
+Once you are inside the virtual environment, all the required dependencies can be installed from the ```requirements.txt```
+file with
+```
+pip install -r requirements.txt
+```
+Afterwards, install the GCE NN package with
+````
+python setup.py install
+````
+
 Then, a good starting point is the Jupyter notebook ```gce_nn_example_notebook.ipynb``` in the ```examples``` folder, which performs a convolutional neural network-based analysis of γ-ray photon-count maps for a simple scenario. To consider a different scenario, generate a new parameter file in the ```parameter_files``` folder (for example by copying the file ```parameters.py``` and modifying the relevant settings). 
 
 ## Results for the *Fermi* data (from arXiv:2107.09070)

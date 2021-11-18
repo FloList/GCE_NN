@@ -1,4 +1,5 @@
 import setuptools
+import os
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -17,6 +18,6 @@ setuptools.setup(
     ],
     package_dir={"GCE": "GCE"},
     packages=setuptools.find_packages(),
-    python_requires=">=3.6",        
+    python_requires=">=3.8",
     long_description_content_type="text/markdown"
 )

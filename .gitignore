@@ -1,5 +1,11 @@
 /venv/
 .DS_Store
 *__pycache__
-.Template_maps
-.Combined_maps
+data/Template_maps/
+data/Combined_maps/
+/gce_nn.egg-info/
+/models/
+/dist/
+/build/
+.idea/
+test_tf_and_ray.py
