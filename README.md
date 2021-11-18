@@ -27,7 +27,7 @@ In particular, the neural network architecture is built upon *DeepSphere* ([Perr
 The *Fermi* dataset and the templates contained in this repository have been generated for the following papers:
 * *Spurious point source signals in the galactic center excess*, Rebecca K. Leane and Tracy R. Slatyer, *Phys. Rev. Lett.* 125, [121105](https://link.aps.org/doi/10.1103/PhysRevLett.125.121105), 2020
 [[arXiv:2002.12370](http://arxiv.org/abs/2002.12370)].
-* *The enigmatic Gtensorflow-io-gcs-filesystem==0.22.0alactic Center excess: Spurious point sources and signal mismodeling*, Rebecca K. Leane and Tracy R. Slatyer, *Phys. Rev. D* 102, [063019](https://link.aps.org/doi/10.1103/PhysRevD.102.063019), 2020 [[arXiv:2002.12371](http://arxiv.org/abs/2002.12371)].
+* *The enigmatic Galactic Center excess: Spurious point sources and signal mismodeling*, Rebecca K. Leane and Tracy R. Slatyer, *Phys. Rev. D* 102, [063019](https://link.aps.org/doi/10.1103/PhysRevD.102.063019), 2020 [[arXiv:2002.12371](http://arxiv.org/abs/2002.12371)].
  
 The data is made available with the permission of the authors, and everybody using the data for a publication should cite these papers.
 
