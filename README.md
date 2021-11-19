@@ -34,6 +34,21 @@ The data is made available with the permission of the authors, and everybody usi
 (The data selection criteria can be found in arXiv:2107.09070.)
 
 ## Getting started
+### Option 1: Try out the code in Google Colab 
+The folder ```examples``` contains an example notebook ```gce_nn_example_notebook_colab.ipynb``` that can be run 
+in Google Colab. The Jupyter notebook will clone this Github repository to the (temporary) ```/content/``` folder
+on Google Colab, so it is **not** needed to manually clone this repository to get started.
+1. Download the notebook with
+   ````
+   wget https://raw.githubusercontent.com/FloList/GCE_NN/main/examples/gce_nn_example_notebook_colab.ipynb
+   ````
+2. Upload the Jupyter notebook to your Google Drive.
+3. Right-click on the Jupyer notebook in Google drive, and select *Open with -> Google Colaboratory*.
+4. Select a GPU runtime.
+5. Run the notebook. (*Note:* After the Github repo has been cloned by the notebook and the packages have been
+installed, the Jupyter notebook kernel needs to be restarted as explained in the notebook.)
+
+### Option 2: Clone the repository and run it locally on your computer
 First, clone the repository via
 ````
 git clone https://github.com/FloList/GCE_NN.git
