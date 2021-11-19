@@ -35,18 +35,16 @@ The data is made available with the permission of the authors, and everybody usi
 
 ## Getting started
 ### Option 1: Try out the code in Google Colab 
-The folder ```examples``` contains an example notebook ```gce_nn_example_notebook_colab.ipynb``` that can be run 
-in Google Colab. The Jupyter notebook will clone this Github repository to the (temporary) ```/content/``` folder
-on Google Colab, so it is **not** needed to manually clone this repository to get started.
-1. Download the notebook with
-   ````
-   wget https://raw.githubusercontent.com/FloList/GCE_NN/main/examples/gce_nn_example_notebook_colab.ipynb
-   ````
-2. Upload the Jupyter notebook to your Google Drive.
-3. Right-click on the Jupyer notebook in Google drive, and select *Open with -> Google Colaboratory*.
-4. Select a GPU runtime.
-5. Run the notebook. (*Note:* After the Github repo has been cloned by the notebook and the packages have been
-installed, the Jupyter notebook kernel needs to be restarted as explained in the notebook.)
+The folder ```examples``` contains an example Jupyter notebook ```gce_nn_example_notebook_colab.ipynb``` that can be run 
+in Google Colab. The Jupyter notebook will clone this Github repository into the (temporary) ```/content/``` folder
+on Google Colab, so it is **not** needed to manually clone or download this repository to get started.
+1. Open [Google Colab](https://colab.research.google.com/).
+2. Click on "Github" in the top panel.
+3. Enter ```https://github.com/FloList/GCE_NN``` and click on "Search".
+4. Select ```examples/gce_nn_example_notebook_colab.ipynb```.
+5. Select a GPU runtime (*Runtime -> Change runtime type -> GPU*).
+6. Run the notebook. (*Note:* After this Github repository has been cloned by the Jupyter notebook and the packages have 
+been installed, the Jupyter notebook kernel needs to be restarted as explained in the notebook.)
 
 ### Option 2: Clone the repository and run it locally on your computer
 First, clone the repository via
@@ -71,13 +69,13 @@ source venv_gce_nn/bin/activate  # activate it
 ````
 or if you are using ```pyenv```
 ```
-pyenv virtualenv 3.8.0 venv_gce_nn
-pyenv activate venv_gce_nn
+pyenv virtualenv 3.8.0 venv_gce_nn  # create the environment
+pyenv activate venv_gce_nn  # activate it
 # pyenv deactivate   # to deactivate the environment
 ```
 or if you are using ```conda```
 ````
-conda create -n venv_gce_nn python=3.8.0 anaconda  # activate it
+conda create -n venv_gce_nn python=3.8.0 anaconda  # create the environment
 conda activate venv_gce_nn  # activate it
 # conda deactivate  # to deactivate the environment
 ````
