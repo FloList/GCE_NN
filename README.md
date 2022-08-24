@@ -1,7 +1,7 @@
 
 # GCE NN
 This repository contains the `Tensorflow` implementation of the papers
-* *Dim but not entirely dark: Extracting the Galactic Center Excess' source-count distribution with neural nets*, Florian List, Nicholas L. Rodd, and Geraint F. Lewis,  accepted by *Phys. Rev. D*, 2021 [[arXiv:2107.09070](https://arxiv.org/abs/2107.09070)]. <br>
+* *Extracting the Galactic Center Excess' source-count distribution with neural nets*, Florian List, Nicholas L. Rodd, and Geraint F. Lewis, *Phys. Rev. D* 104, [123022](https://link.aps.org/doi/10.1103/PhysRevD.104.123022), 2021 [[arXiv:2107.09070](https://arxiv.org/abs/2107.09070)]. <br>
  **→** Branch "**prd**"  
 * *Galactic Center Excess in a New Light: Disentangling the γ-Ray Sky with Bayesian Graph Convolutional Neural Networks*, Florian List, Nicholas L. Rodd, Geraint F. Lewis, and Ishaan Bhat, *Phys. Rev. Lett.* 125, [241102](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.125.241102), 2020 [[arXiv:2006.12504](https://arxiv.org/abs/2006.12504)]. <br>
  **→** Branch "**prl**"  
@@ -106,9 +106,12 @@ archivePrefix = {arXiv},
 arxivId = {2107.09070},
 author = {List, Florian and Rodd, Nicholas L. and Lewis, Geraint F.},
 eprint = {2107.09070},
-journal = {preprint},
-title = {{Dim but not entirely dark: Extracting the Galactic Center Excess' source-count distribution with neural nets}},
-url = {http://arxiv.org/abs/2107.09070},
+journal = {Physical Review D},
+volume = {104},
+number = {12},
+pages = {123022},
+title = {{Extracting the Galactic Center Excess' source-count distribution with neural nets}},
+url = {https://link.aps.org/doi/10.1103/PhysRevD.104.123022},
 year = {2021}
 }
 ```
