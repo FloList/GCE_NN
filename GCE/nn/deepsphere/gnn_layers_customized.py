@@ -27,7 +27,7 @@ class Chebyshev(Layer):
         """
 
         # This is necessary for every Layer
-        super(Chebyshev, self).__init__(name='')
+        super(Chebyshev, self).__init__()
 
         # save necessary params
         self.L = L
@@ -38,7 +38,7 @@ class Chebyshev(Layer):
         if self.use_bn == 1:
             self.bn = tf.keras.layers.BatchNormalization(axis=-1, momentum=0.9, epsilon=1e-5, center=False, scale=False)
         elif self.use_bn == 2:
-            self.inst_norm = tf.keras.layers.Lambda(instance_normalization, name="instance_norm")
+            self.inst_norm = tf.keras.layers.Lambda(instance_normalization)
         self.initializer = initializer
         if activation is None or callable(activation):
             self.activation = activation
@@ -170,7 +170,7 @@ class Monomial(Layer):
         """
 
         # This is necessary for every Layer
-        super(Monomial, self).__init__(name='')
+        super(Monomial, self).__init__()
 
         # save necessary params
         self.L = L
@@ -181,7 +181,7 @@ class Monomial(Layer):
         if self.use_bn == 1:
             self.bn = tf.keras.layers.BatchNormalization(axis=-1, momentum=0.9, epsilon=1e-5, center=False, scale=False)
         elif self.use_bn == 2:
-            self.inst_norm = tf.keras.layers.Lambda(instance_normalization, name="instance_norm")
+            self.inst_norm = tf.keras.layers.Lambda(instance_normalization)
         self.initializer = initializer
         if activation is None or callable(activation):
             self.activation = activation
@@ -310,7 +310,7 @@ class GCNN_ResidualLayer(Layer):
         :param alpha: Coupling strength of the input -> layer(input) + alpha*input
         """
         # This is necessary for every Layer
-        super(GCNN_ResidualLayer, self).__init__(name='')
+        super(GCNN_ResidualLayer, self).__init__()
 
         # save variables
         self.layer_type = layer_type
