@@ -63,9 +63,9 @@ class DeepsphereCNN:
 
             # Now, build the keras model
             if tau is not None:
-                model = tf.keras.Model(inputs=[input_tensor, tau], outputs=outdict)
+                model = tf.keras.Model(inputs=[input_tensor, tau], outputs=outdict, name="model")
             else:
-                model = tf.keras.Model(inputs=input_tensor, outputs=outdict)
+                model = tf.keras.Model(inputs=input_tensor, outputs=outdict, name="model")
 
             # Print summary
             model.summary()

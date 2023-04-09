@@ -113,7 +113,7 @@ def get_params(int_flag=0):
     # Note: this is ignored if p_data["psf"] = False.
     p_data["mask_type"] = "3FGL"  # mask for known bright PSs: one of "None", "3FGL", "4FGL"
     p_data["nside"] = int(128)  # nside resolution parameter of the data
-    p_data["exposure"] = "Fermi"  # one of "Fermi", "Fermi_mean", or constant integer
+    p_data["exposure"] = "Fermi"  # one of "Fermi", "Fermi_mean", or constant float
     p_data["psf"] = True  # if True: apply Fermi PSF to PS templates when generating PS maps
     # (see the function fermi_psf() in data_utils.py)
     p["data"] = p_data

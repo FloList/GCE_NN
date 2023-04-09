@@ -118,19 +118,26 @@ def make_mask_total(nside=128,
     return mask_array
 
 
-def get_template(fermi_folder, temp):
+def get_template(fermi_folder, temp, smooth=False):
     """
     Returns a template.
     :param fermi_folder: folder containing the template maps
     :param temp: short name of template
+    :param smooth: if True, take PSF-smoothed version
     :return: template
     """
     if temp == "iso":
-        t = np.load(os.path.join(fermi_folder, 'template_iso.npy'))
+        if smooth:
+            t = np.load(os.path.join(fermi_folder, 'template_iso_smooth.npy'))
+        else:
+            t = np.load(os.path.join(fermi_folder, 'template_iso.npy'))
     elif temp == "dif":
         t = np.load(os.path.join(fermi_folder, 'template_dif.npy'))
     elif temp == "bub":
-        t = np.load(os.path.join(fermi_folder, 'template_bub.npy'))
+        if smooth:
+            t = np.load(os.path.join(fermi_folder, 'template_bub_smooth.npy'))
+        else:
+            t = np.load(os.path.join(fermi_folder, 'template_bub.npy'))
     elif temp == "bub_var":
         try:
             t = np.load(os.path.join(fermi_folder, 'template_nbub.npy'))
@@ -138,14 +145,26 @@ def get_template(fermi_folder, temp):
             t = np.load(os.path.join(fermi_folder, 'template_bub_alt.npy'))
     elif temp == "gce":
         try:
-            t = np.load(os.path.join(fermi_folder, 'template_gce.npy'))
+            if smooth:
+                t = np.load(os.path.join(fermi_folder, 'template_gce_smooth.npy'))
+            else:
+                t = np.load(os.path.join(fermi_folder, 'template_gce.npy'))
         except FileNotFoundError:
-            t = np.load(os.path.join(fermi_folder, 'template_nfw_g1p0.npy'))
+            if smooth:
+                t = np.load(os.path.join(fermi_folder, 'template_nfw_g1p0_smooth.npy'))
+            else:
+                t = np.load(os.path.join(fermi_folder, 'template_nfw_g1p0.npy'))
     elif temp == "gce_12":
         try:
-            t = np.load(os.path.join(fermi_folder, 'template_gce_gamma_1.20.npy'))
+            if smooth:
+                t = np.load(os.path.join(fermi_folder, 'template_gce_gamma_1.20_smooth.npy'))
+            else:
+                t = np.load(os.path.join(fermi_folder, 'template_gce_gamma_1.20.npy'))
         except FileNotFoundError:
-            t = np.load(os.path.join(fermi_folder, 'template_nfw_g1p2.npy'))
+            if smooth:
+                t = np.load(os.path.join(fermi_folder, 'template_nfw_g1p2_smooth.npy'))
+            else:
+                t = np.load(os.path.join(fermi_folder, 'template_nfw_g1p2.npy'))
     elif temp == "gce_12_N":
         t = np.load(os.path.join(fermi_folder, 'template_gce_gamma_1.20_N.npy'))
     elif temp == "gce_12_S":

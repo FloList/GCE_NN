@@ -144,7 +144,7 @@ class Analysis:
         if "data" in self.p.keys() and "nn" in self.p.keys():
             assert self.p.data["nside"] == self.p.nn.arch["nsides"][0],\
                 "nside = {:}, but nsides[0] = {:}!".format(self.p.data["nside"], self.p.nn.arch["nsides"][0])
-        if "comb" in self.p.keys() and "nn" in self.p.keys():
+        if "comb" in self.p.keys() and "nn" in self.p.keys() and self.p.nn.hist["return_hist"]:
             assert np.all([temp in self.p.comb["hist_templates"] for temp in self.p.nn.hist["hist_templates"]]), \
                 "self.p.nn.hist['hist_templates'] must be a subset of self.p.comb['hist_templates']!"
             assert self.p.comb["do_" + self.p.nn.hist["which_histogram"]], \
@@ -286,6 +286,8 @@ class Analysis:
         # Store histogram template indices and names
         if "nn" in self.p.keys() and "mod" in self.p.keys():
             if self.p.nn.hist["return_hist"]:
+                assert np.all([t in self.p.mod["models"] for t in self.p.nn.hist["hist_templates"]]), \
+                    "Not all hist_templates are contained in self.p.mod['models']!"
                 self.p.nn.hist["hist_template_inds"] = np.asarray(([np.argwhere([mod == t
                                                                                  for mod in self.p.mod["models"]])
                                                                     for t in self.p.nn.hist["hist_templates"]])
