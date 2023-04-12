@@ -9,3 +9,4 @@ data/Combined_maps/
 /build/
 .idea/
 test_tf_and_ray.py
+/data/

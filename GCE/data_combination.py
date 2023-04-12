@@ -158,9 +158,14 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                                                for key in [*train_files_dict]]), axis=0).squeeze()
 
     # Get number of files
-    n_files_train = len(train_files_dict[files_dict_no_add_two[0]])
-    n_files_val = len(val_files_dict[files_dict_no_add_two[0]])
-    n_files_test = len(test_files_dict[files_dict_no_add_two[0]])
+    if len(files_dict_no_add_two) > 0:
+        n_files_train = len(train_files_dict[files_dict_no_add_two[0]])
+        n_files_val = len(val_files_dict[files_dict_no_add_two[0]])
+        n_files_test = len(test_files_dict[files_dict_no_add_two[0]])
+    else:
+        n_files_train = len(train_files_dict[add_two_temps_ps[0]]) // 2
+        n_files_val = len(val_files_dict[add_two_temps_ps[0]]) // 2
+        n_files_test = len(test_files_dict[add_two_temps_ps[0]]) // 2
 
     # Set filenames of output files
     n_dig = int(np.ceil(np.log10(max(n_files_train, n_files_val, n_files_test))))
@@ -208,9 +213,10 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
             print_str = "=== TESTING DATA ==="
 
         # Check correctness
-        assert np.all([len(files_dict[key]) == len(files_dict[files_dict_no_add_two[0]])
-                       for key in files_dict_no_add_two]), \
-            "The number of files for each model is not the same! Aborting..."
+        if len(files_dict_no_add_two) > 0:
+            assert np.all([len(files_dict[key]) == len(files_dict[files_dict_no_add_two[0]])
+                           for key in files_dict_no_add_two]), \
+                "The number of files for each model is not the same! Aborting..."
 
         # Write a combined settings dictionary (need to reorder: temp -> key => key -> temp)
         if tvt == 0:

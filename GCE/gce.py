@@ -115,7 +115,7 @@ class Analysis:
         Check that parameters are correct and consistent.
         """
         if "data" in self.p.keys():
-            assert self.p.data["mask_type"] in ["None", "3FGL", "4FGL"], \
+            assert self.p.data["mask_type"] in [None, "None", "3FGL", "4FGL"], \
                 "Mask type not recognised!"
             if isinstance(self.p.data["exposure"], str):
                 assert self.p.data["exposure"] in ["Fermi", "Fermi_mean"], \
@@ -226,7 +226,8 @@ class Analysis:
                 n_hist_templates = len(self.p.nn.hist["hist_templates"])
                 self.p.nn.hist["n_bins"] = len(self.p.nn.hist["nn_hist_bins"]) - 1
                 len(self.p.nn.hist["hist_templates"])
-                self.p.nn["label_shape"] = [[self.p.mod["n_models"]], [self.p.nn.hist["n_bins"], n_hist_templates]]
+                n_bins = self.p.nn.hist["n_bins"]
+                self.p.nn["label_shape"] = [[self.p.mod["n_models"]], [n_bins, n_hist_templates]]
                 # flux fractions, SCD histograms
             else:
                 self.p.nn["label_shape"] = [[self.p.mod["n_models"]]]  # flux fractions
@@ -249,7 +250,7 @@ class Analysis:
 
         # Does the NN require tau as an input?
         if "nn" in self.p.keys() and "train" in self.p.keys():
-            if self.p.nn.hist["return_hist"] and self.p.train["hist_loss"].upper() == "EMPL":
+            if self.p.nn.hist["return_hist"] and "EMPL" in self.p.train["hist_loss"].upper():
                 self.p.nn.requires_tau = True
             else:
                 self.p.nn.requires_tau = False
@@ -346,7 +347,7 @@ class Analysis:
         elif self.p.data["mask_type"] == "4FGL":
             total_mask_neg = (1 - (1 - total_mask_neg)
                               * (1 - get_template(fermi_folder, "4FGL_mask"))).astype(bool)
-        elif self.p.data["mask_type"] is not None:
+        elif self.p.data["mask_type"] not in [None, "None"]:
             warnings.warn("Warning! The mask type self.p.data['mask_type'] = '{:}' is not recognized and will be "
                           "ignored. Choose '3FGL', '4FGL', or None.".format(self.p.data["mask_type"]))
 
@@ -667,11 +668,21 @@ class Analysis:
             if which == "histograms":
                 tau_dist = tfp.distributions.Uniform(low=0.0, high=1.0)
 
+                # if flux queries need to be drawn for the continuous case
+                if self.p.nn.hist["continuous"]:
+                    normed_flux_query_dist = tfp.distributions.Uniform(low=0.0, high=1.0)
+
         # NN input helper function that takes care of quantile levels tau during training
         def get_nn_input(data_):
             if self.p.nn.requires_tau:
                 tau = tau_dist.sample((data_.shape[0], 1)) if which == "histograms" else median_tau
-                nn_input = [data_, tau]
+                if self.p.nn.hist["continuous"]:
+                    # draw normalized flux values in (0, 1)
+                    normed_flux_queries = normed_flux_query_dist.sample((data_.shape[0],
+                                                                         len(self.p.nn.hist["hist_templates"])))
+                    nn_input = [data_, tau, normed_flux_queries]
+                else:
+                    nn_input = [data_, tau]
             else:
                 nn_input = data_
             return nn_input
@@ -701,19 +712,19 @@ class Analysis:
 
         # Wrapper around get_loss that takes care of the replicas in case multiple GPUs are available
         # NOTE: this function should NOT be used in distributed train step because gradients need to go inside strategy
-        @tf.function
+        @tf.function  # TODO
         def distributed_get_loss(data_, label_, global_size, training):
             per_replica_losses = self._strategy.run(get_loss, args=(data_, label_, global_size, training))
             return self._strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses, axis=None)
 
         # Wrapper around train_step that takes care of the replicas in case multiple GPUs are available
-        @tf.function
+        @tf.function  # TODO
         def distributed_train_step(data_, label_, global_size):
             per_replica_losses = self._strategy.run(train_step, args=(data_, label_, global_size))
             return self._strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses, axis=None)
 
         # Wrapper around get_metrics that takes care of the replicas in case multiple GPUs are available
-        @tf.function
+        @tf.function  # TODO
         def distributed_get_metrics(data_, label_, global_size, training=False):
             per_replica_metrics = self._strategy.run(get_metrics, args=(data_, label_, global_size, training))
             return [self._strategy.reduce(tf.distribute.ReduceOp.SUM, metric, axis=None)
@@ -756,7 +767,7 @@ class Analysis:
 
                     # Evaluate
                     with summary_writer.as_default():
-                        tf.summary.scalar('learning_rate', optimizer.learning_rate(global_step), step=global_step)
+                        tf.summary.scalar('learning_rate', optimizer.learning_rate, step=global_step)  # deleted (global_step)
                         tf.summary.scalar('losses/' + which + '/train_loss', loss_eval.numpy(), step=global_step)
 
                         # Metrics on training data. NOTE: evaluating in "training = True" mode here
@@ -830,12 +841,14 @@ class Analysis:
         checkpoint = tf.train.Checkpoint(optimizer=optimizer, model=self.nn)
         return optimizer, checkpoint
 
-    def predict(self, data, tau=None, multiple_taus=False, compress=False, remove_exp=False, training=False):
+    def predict(self, data, tau=None, normed_flux_queries=None, multiple_taus=False, compress=False, remove_exp=False,
+                training=False):
         """
         This method is a wrapper around tf.keras.Model.call() that takes care of things such as the quantile levels and
         input shapes.
         :param data: numpy array or tensorflow tensor with photon-count map(s)
         :param tau: if not None: quantile levels of interest for SCD histograms
+        :param normed_flux_queries: if flux queries are provided for continuous EMPL
         :param multiple_taus: if True, the neural network will be evaluated for ALL the values in tau (the same quantile
         levels are used for all the maps in data)
         :param compress: set this to True if full maps are provided to this function, they will then be compressed
@@ -880,7 +893,11 @@ class Analysis:
             else:
                 if np.isscalar(tau):
                     tau = tau * np.ones((data.shape[0], 1))
-                nn_input = [data, tau]
+                if self.p.nn.hist["continuous"]:
+                    assert normed_flux_queries is not None, "Flux queries must be provided for continuous EMPL!"
+                    nn_input = [data, tau, normed_flux_queries]
+                else:
+                    nn_input = [data, tau]
         else:
             nn_input = data
             if tau is not None:
@@ -898,10 +915,13 @@ class Analysis:
             outdict = {}
             for i_ql, ql in enumerate(tau):
                 this_ql = ql * np.ones((data.shape[0], 1))
-                this_outdict = self.nn([data, this_ql], training=training)
+                if self.p.nn.hist["continuous"]:
+                    this_outdict = self.nn([data, this_ql, normed_flux_queries], training=training)
+                else:
+                    this_outdict = self.nn([data, this_ql], training=training)
 
                 for k in this_outdict.keys():
-                    if k in ["tau", "hist"]:
+                    if k in ["tau", "hist", "f_query"]:
                         if k not in outdict:
                             outdict[k] = tf.expand_dims(this_outdict[k], 0)
                         else:
@@ -950,8 +970,11 @@ class Analysis:
 
         # Save a flowchart to the figures folder
         # The following requires pydot and graphviz to be installed
-        tf.keras.utils.plot_model(self.nn, show_shapes=True, to_file=os.path.join(self.p.nn["figures_folder"],
-                                                                                  filename))
+        try:
+            tf.keras.utils.plot_model(self.nn, show_shapes=True, to_file=os.path.join(self.p.nn["figures_folder"],
+                                                                                      filename))
+        except AssertionError:
+            pass  # in case plotting doesn't work
 
     def plot_flux_fractions(self, true_ffs, preds, **kwargs):
         """

@@ -77,6 +77,11 @@ def get_loss_and_keys_histograms(hist_loss_str, smoothing_empl=None):
     elif hist_loss_str.lower() == "empl":
         def loss(y_true, y_pred, tau): return empl(y_true, y_pred, tau, smoothing=smoothing_empl)
         loss_keys += ["tau"]
+    elif hist_loss_str.lower() == "empl_continuous":
+        def loss(y_true, y_pred, tau, normed_flux_queries):
+            return empl_continuous(y_true, y_pred, tau, normed_flux_queries=normed_flux_queries,
+                                   smoothing=smoothing_empl)
+        loss_keys += ["tau", "f_query"]
     else:
         raise NotImplementedError
     return loss, loss_keys
@@ -188,6 +193,47 @@ def empl(y_true, y_pred, tau, weights=None, smoothing=0.0):
     """
     ecdf_true = tf.math.cumsum(y_true, axis=1)
     ecdf_pred = tf.math.cumsum(y_pred, axis=1)
+    delta = ecdf_pred - ecdf_true
+
+    # If there is an extra dimension for the channel: tau might need to be expanded
+    if len(tau.shape) == 2 and len(delta.shape) == 3:
+        tau = tf.expand_dims(tau, 2)
+
+    # Non-smooth C0 loss (default)
+    if smoothing == 0.0:
+        mask = tf.cast(tf.greater_equal(delta, tf.zeros_like(delta)), tf.float32) - tau
+        loss = mask * delta
+
+    # Smooth loss
+    else:
+        loss = -tau * delta + smoothing * tf.math.softplus(delta / smoothing)
+
+    if weights is None:
+        weights = tf.ones_like(ecdf_true)
+
+    if len(weights.shape) < len(y_true.shape):  # if bin-dimension is missing
+        weights = tf.expand_dims(weights, 1)
+
+    # avg. the weighted loss over the bins (1) and channel dimension (2)
+    return tf.reduce_mean(loss * weights, [1, 2])
+
+def empl_continuous(y_true, y_pred, tau, normed_flux_queries, weights=None, smoothing=0.0):
+    """
+    Compute the continuous Earth Mover's Pinball Loss (arXiv:2106.02051).
+    :param y_true: label
+    :param y_pred: prediction
+    :param tau: quantile levels of interest
+    :param normed_flux_queries: normed flux queries in (0, 1) for each template
+    :param weights: weight the loss differently for different samples
+    :param smoothing: scalar >= 0 that determines smoothing of loss function around 0
+    :return Earth Mover's Pinball Loss
+    # TODO: TRY OUT WITH >1 TEMPLATES!
+    """
+    batch_inds = tf.range(y_true.shape[0], dtype=tf.int32)[:, None]
+    query_inds = tf.cast(tf.math.floor(normed_flux_queries * y_true.shape[1]), tf.int32)
+    ecdf_true_all = tf.math.cumsum(y_true, axis=1)
+    ecdf_true = tf.squeeze(tf.gather_nd(ecdf_true_all, tf.stack((batch_inds, query_inds), -1)), -1)
+    ecdf_pred = y_pred[:, 0, :]
     delta = ecdf_pred - ecdf_true
 
     # If there is an extra dimension for the channel: tau might need to be expanded
