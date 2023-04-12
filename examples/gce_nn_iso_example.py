@@ -9,8 +9,6 @@ import GCE.gce
 gce = GCE.gce.Analysis()
 
 gce.load_params("../parameter_files/parameters_isotropic.py")
-
-
 gce.print_params()
 
 # Ray settings (for parallelized data generation)
@@ -23,7 +21,7 @@ gce.print_params()
 # gce.delete_run(confirm=False)
 gce.build_pipeline()
 gce.build_nn()
-gce.train_nn("histograms")
+# gce.train_nn("histograms")
 # gce.load_nn()
 
 n_samples = 5
@@ -41,12 +39,29 @@ hists = np.asarray([p["hist"] for p in preds])
 
 colors = plt.cm.get_cmap("RdBu")(tau_mid)
 median_ind = len(tau) // 2
-fig, axs = plt.subplots(1, n_samples)
+x_vals_all = gce.p.nn.hist["nn_hist_centers"]
+x_vals_plot = np.interp(normed_flux_queries, np.linspace(0.0, 1.0, gce.p.nn.hist.n_bins), x_vals_all)
+
+fig, axs = plt.subplots(2, n_samples, figsize=(34, 12))
 for i_sample in range(n_samples):
-    axs[i_sample].plot(test_hists[i_sample, :, 0].cumsum(), "k-", zorder=3)
+    # Plot dN/dF
+
+    axs[0, i_sample].semilogx(x_vals_all, test_hists[i_sample, :, 0].cumsum(), "k-", zorder=3)
     for i_tau in range(len(tau) - 1):
-        axs[i_sample].fill_between(10000 * normed_flux_queries,
+        axs[0, i_sample].fill_between(x_vals_plot,
                                    y1=hists[:, i_tau, i_sample, 0, 0],
                                    y2=hists[:, i_tau+1, i_sample, 0, 0],
                                    color=colors[i_tau], alpha=0.5)
-    axs[i_sample].plot(10000 * normed_flux_queries, hists[:, median_ind, i_sample, 0, 0], color="gold")
+    axs[0, i_sample].semilogx(x_vals_plot, hists[:, median_ind, i_sample, 0, 0], color="gold")
+    axs[0, i_sample].set_xlabel(r"$F$")
+    axs[0, i_sample].axvline(1, color="k", ls="--")
+
+    # Plot map
+    hp.cartview(gce.decompress(test_data[i_sample], fill_value=np.nan), nest=True, fig=fig,
+                sub=(2, n_samples, n_samples + i_sample + 1), title=f"{i_sample}", cmap="magma")
+    axs[1, i_sample].axis("off")
+
+
+axs[0, 0].set_ylabel(r"$F^2 \ \frac{dN}{dF}$")
+plt.tight_layout()
+plt.subplots_adjust(hspace=0)
