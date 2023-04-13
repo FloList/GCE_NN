@@ -782,7 +782,7 @@ class Analysis:
                     # Evaluate
                     with summary_writer.as_default():
                         # TF behavior changed!
-                        if tf.__version__[2] >= 11:
+                        if int(tf.__version__[2]) >= 11:
                             lr_summary = optimizer.learning_rate
                         else:
                             lr_summary = optimizer.learning_rate(global_step)
