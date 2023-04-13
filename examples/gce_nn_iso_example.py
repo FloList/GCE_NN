@@ -18,10 +18,11 @@ gce.print_params()
 # gce.combine_template_maps(save_filenames=True, do_combine=True)
 # sys.exit(0)
 
-# gce.delete_run(confirm=False)
+gce.delete_run(confirm=False)
 gce.build_pipeline()
 gce.build_nn()
 # gce.train_nn("histograms")
+# sys.exit(0)
 # gce.load_nn()
 
 n_samples = 5
@@ -42,7 +43,7 @@ median_ind = len(tau) // 2
 x_vals_all = gce.p.nn.hist["nn_hist_centers"]
 x_vals_plot = np.interp(normed_flux_queries, np.linspace(0.0, 1.0, gce.p.nn.hist.n_bins), x_vals_all)
 
-fig, axs = plt.subplots(2, n_samples, figsize=(34, 12))
+fig, axs = plt.subplots(2, n_samples, figsize=(34, 12), squeeze=False)
 for i_sample in range(n_samples):
     # Plot dN/dF
 
@@ -65,3 +66,8 @@ for i_sample in range(n_samples):
 axs[0, 0].set_ylabel(r"$F^2 \ \frac{dN}{dF}$")
 plt.tight_layout()
 plt.subplots_adjust(hspace=0)
+
+
+# Check monotonicity
+min_diff_wrt_F = np.min(np.diff(hists[:, :, :, 0, 0], axis=0))  # monotonicity w.r.t. F
+min_diff_wrt_tau = np.min(np.diff(hists[:, :, :, 0, 0], axis=1))  # monotonicity w.r.t. tau

@@ -52,8 +52,8 @@ class HealpyGCNN:
         :return output dictionary, preprocessed input (can be reused)
         """
         pa = self._p.nn.arch
-
         need_concat = False  # flag indicating if 2nd(+) channel (which is NOT preprocessed!) needs to be concatenated
+        monotonicity_constraints = 0.0  # initialize variable to 0
 
         # If t has no channel dimension: add dimension
         if len(input_tensor.shape) == 2:
@@ -154,33 +154,30 @@ class HealpyGCNN:
             # Also append flux queries if needed
             if normed_flux_queries is not None:
                 t = tf.concat([t, (normed_flux_queries - 0.5) * 12], axis=1)
+                monotonicity_constraints = tf.reduce_sum(t[:, -1 - len(self._p.nn.hist["hist_templates"]):], axis=-1,
+                                                         keepdims=True)
 
         # Fully-connected blocks
         # Note: batch norm is provided in a single array for conv. layers and FC layers!
-        monotonicity_constraints = 0.0
-
         for il in range(len(pa["M"])):
             constraint = False
             do_groupsort = False
             this_activation = pa["activation"]
 
-            # if tau is not None and self._p.nn.hist["enforce_monotonicity"]:
-            #     # enforce_monotonicity_for_final = 1 + len(self._p.nn.hist["hist_templates"]) \
-            #     #     if self._p.nn.hist["continuous"] else 1   # tau and f_queries else only tau
-            #     monotonicity_constraints = tf.reduce_sum(t[:, -1 - len(self._p.nn.hist["hist_templates"]):], axis=-1, keepdims=True)
-            #     this_activation = None
-            #     constraint = True
-            #     do_groupsort = True
+            if tau is not None and self._p.nn.hist["enforce_monotonicity"]:
+                this_activation = None
+                constraint = True
+                do_groupsort = True
 
             t = hp_nn.FullyConnectedBlock(Fout=pa["M"][il], use_bias=True,
                                           use_bn=pa['batch_norm'][len(pa["F"]) + il],
                                           activation=this_activation, constraint=constraint, do_groupsort=do_groupsort)(t)
 
-        # Final fully-connected layer without activation  TODO!!!
-        # if self._p.nn.hist["enforce_monotonicity"]:
-        #     t = hp_nn.ConstraintDense(self.dim_out_flat, use_bias=False, do_groupsort=False)(t)
-        # else:
-        t = tf.keras.layers.Dense(self.dim_out_flat, use_bias=False)(t)
+        # Final fully-connected layer without activation
+        if self._p.nn.hist["enforce_monotonicity"]:
+            t = hp_nn.ConstraintDense(self.dim_out_flat, use_bias=False, do_groupsort=False)(t)
+        else:
+            t = tf.keras.layers.Dense(self.dim_out_flat, use_bias=False)(t)
 
         # For histograms: reshape to n_batch x n_bins x n_hist_templates
         if self.which == "histograms":

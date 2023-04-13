@@ -449,7 +449,7 @@ class FullyConnectedBlock(Layer):
         Build the weights of the layer
         :param input_shape: shape of the input, batch dim has to be defined
         """
-        kernel_initializer = "glorot_uniform" if self.initializer is None else self.initializer
+        kernel_initializer = "he_uniform" if self.initializer is None else self.initializer
         if self.constraint:
             # self.fc = tf.keras.layers.Dense(self.Fout, use_bias=self.use_bias, kernel_initializer=kernel_initializer)  # TODO!!! MONOTONIC!
             self.fc = ConstraintDense(self.Fout, kernel_initializer=kernel_initializer, do_groupsort=self.do_groupsort)
@@ -525,6 +525,7 @@ class FinalLayer(Layer):
         if self._which == "flux_fractions":
 
             # Aleatoric uncertainty covariance matrix
+
             if self._p.nn.ff["alea_covar"]:
                 output_dict["ff_mean"], output_dict["ff_covar"] = split_mean_cov(x, self.activation,
                                                                                  self._p.mod["n_models"], eps=1e-6)
@@ -543,7 +544,7 @@ class FinalLayer(Layer):
         else:
             if self._p.nn.hist["enforce_monotonicity"]:
                 assert "monotonicity_constraints" in kwargs.keys()
-                x += 0.0 * kwargs["monotonicity_constraints"]  # TODO!!
+                x += 1.0 * kwargs["monotonicity_constraints"]  # TODO!!
 
             x = self.activation(x)
             output_dict["hist"] = x
@@ -680,7 +681,7 @@ class ConstraintDense(tf.keras.layers.Layer):
     def __init__(self, Fout, kernel_initializer=None, use_bias=True, do_groupsort=False, **kwargs):
         super().__init__(**kwargs)
         self.Fout = Fout
-        self.initializer = "glorot_uniform" if kernel_initializer is None else kernel_initializer
+        self.initializer = "he_uniform" if kernel_initializer is None else kernel_initializer
         self.use_bias = use_bias
         self.do_groupsort = do_groupsort
 
@@ -688,7 +689,9 @@ class ConstraintDense(tf.keras.layers.Layer):
         super().build(input_shape)
         self.kernel = self.add_weight(name='kernel', shape=(input_shape[-1], self.Fout),
                                       trainable=True,
-                                      constraint=tf.keras.constraints.MaxNorm(max_value=np.infty))  # TODO!!!
+                                      constraint=NormalizeWeights(max_norm=1.0))  # TODO!!!
+        # self.kernel = NormalizeWeights(max_norm=np.infty)(self.kernel)  # need to normalize it manually once  # TODO
+
         if self.use_bias:
             self.bias = self.add_weight(name='bias', shape=(self.Fout,), initializer='zeros', trainable=True)
 
@@ -699,6 +702,20 @@ class ConstraintDense(tf.keras.layers.Layer):
             output = tf.nn.bias_add(output, self.bias)
 
         if self.do_groupsort:
-            output = GroupSort(n_groups=2)(output)  # TODO
-
+            output = GroupSort(n_groups=64)(output)  # TODO
+            # output = tf.nn.relu(output)  # TODO!!
         return output
+
+
+
+# Lipschitz constraint (from https://github.com/niklasnolte/MonotoneNorm/blob/main/monotonenorm/functional.py)
+class NormalizeWeights(tf.keras.constraints.Constraint):
+    def __init__(self, max_norm=1.0):
+        self.max_norm = max_norm
+    def __call__(self, w):
+        norms = tf.reduce_sum(tf.abs(w), axis=1, keepdims=True)  # NOTE: the weights are transposed in comparison to niklasnolte implementation!
+        norms = tf.maximum(tf.ones_like(norms), norms / self.max_norm)
+        return w / tf.maximum(norms, tf.ones_like(norms))
+
+    def get_config(self):
+        return {'max_norm': self.max_norm}

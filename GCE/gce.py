@@ -666,7 +666,14 @@ class Analysis:
         if self.p.nn.requires_tau:
             median_tau = 0.5 * tf.ones((self.p.train["batch_size"], 1))
             if which == "histograms":
-                tau_dist = tfp.distributions.Uniform(low=0.0, high=1.0)
+                if self.p.train["hist_tau_prior"] == "uniform":
+                    tau_dist = tfp.distributions.Uniform(low=0.0, high=1.0)
+                elif self.p.train["hist_tau_prior"] == "uniform_in_z":
+                    z_abs_max = 3.5
+                    norm_dist = tfp.distributions.Normal(loc=0.0, scale=1.0)
+                    z_dist = tfp.distributions.Uniform(low=-z_abs_max, high=z_abs_max)
+                else:
+                    raise NotImplementedError(f"hist_tau_prior {self.p.train['hist_tau_prior']} unknown!")
 
                 # if flux queries need to be drawn for the continuous case
                 if self.p.nn.hist["continuous"]:
@@ -675,7 +682,14 @@ class Analysis:
         # NN input helper function that takes care of quantile levels tau during training
         def get_nn_input(data_):
             if self.p.nn.requires_tau:
-                tau = tau_dist.sample((data_.shape[0], 1)) if which == "histograms" else median_tau
+                if which != "histograms":
+                    tau = median_tau
+                elif self.p.train["hist_tau_prior"] == "uniform":
+                    tau = tau_dist.sample((data_.shape[0], 1))
+                elif self.p.train["hist_tau_prior"] == "uniform_in_z":
+                    z_vals = z_dist.sample((data_.shape[0], 1))
+                    tau = norm_dist.cdf(z_vals)
+
                 if self.p.nn.hist["continuous"]:
                     # draw normalized flux values in (0, 1)
                     normed_flux_queries = normed_flux_query_dist.sample((data_.shape[0],
