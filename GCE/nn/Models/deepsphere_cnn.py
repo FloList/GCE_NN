@@ -31,6 +31,7 @@ class DeepsphereCNN:
             input_tensor = tf.keras.Input(shape=(self._p.nn["input_shape"]))
 
             tau = None
+            normed_flux_queries = None
             outdict = {}
 
             # Flux fraction submodel
@@ -52,18 +53,25 @@ class DeepsphereCNN:
                                                tf.expand_dims(poissonian_residual, 2)], axis=2)  # 2nd channel: residual
 
                 # Define tau input tensor here:
-                if self._p.train["hist_loss"].upper() == "EMPL":
+                if "EMPL" in self._p.train["hist_loss"].upper():
                     tau = tf.keras.Input(shape=1)
 
+                    if self._p.nn.hist["continuous"]:
+                        normed_flux_queries = tf.keras.Input(shape=len(self._p.nn.hist["hist_templates"]))
+
                 model_hist = HealpyGCNN(which="histograms", params=self._p, index_dict=self._index_dict)
-                model_hist_outdict, _ = model_hist.compute_output(input_tensor=hist_nn_input, tau=tau)
+                model_hist_outdict, _ = model_hist.compute_output(input_tensor=hist_nn_input, tau=tau,
+                                                                  normed_flux_queries=normed_flux_queries)
                 outdict = {**outdict, **model_hist_outdict}
 
             assert len(outdict) > 0, "Nothing to predict: neither flux fractions nor SCD histograms have been selected!"
 
             # Now, build the keras model
             if tau is not None:
-                model = tf.keras.Model(inputs=[input_tensor, tau], outputs=outdict, name="model")
+                if normed_flux_queries is not None:
+                    model = tf.keras.Model(inputs=[input_tensor, tau, normed_flux_queries], outputs=outdict, name="model")
+                else:
+                    model = tf.keras.Model(inputs=[input_tensor, tau], outputs=outdict, name="model")
             else:
                 model = tf.keras.Model(inputs=input_tensor, outputs=outdict, name="model")
 
