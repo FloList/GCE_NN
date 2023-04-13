@@ -781,7 +781,12 @@ class Analysis:
 
                     # Evaluate
                     with summary_writer.as_default():
-                        tf.summary.scalar('learning_rate', optimizer.learning_rate, step=global_step)  # deleted (global_step)
+                        # TF behavior changed!
+                        if tf.__version__[2] >= 11:
+                            lr_summary = optimizer.learning_rate
+                        else:
+                            lr_summary = optimizer.learning_rate(global_step)
+                        tf.summary.scalar('learning_rate', lr_summary, step=global_step)  # deleted (global_step)
                         tf.summary.scalar('losses/' + which + '/train_loss', loss_eval.numpy(), step=global_step)
 
                         # Metrics on training data. NOTE: evaluating in "training = True" mode here
