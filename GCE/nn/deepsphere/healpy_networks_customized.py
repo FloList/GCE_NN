@@ -53,7 +53,7 @@ class HealpyGCNN:
         """
         pa = self._p.nn.arch
         need_concat = False  # flag indicating if 2nd(+) channel (which is NOT preprocessed!) needs to be concatenated
-        monotonicity_constraints = 0.0  # initialize variable to 0
+
 
         # If t has no channel dimension: add dimension
         if len(input_tensor.shape) == 2:
@@ -68,6 +68,9 @@ class HealpyGCNN:
 
         # Get total counts
         tot_counts = tf.reduce_sum(first_channel, axis=1, keepdims=True)
+
+        # Get standard deviation
+        std = tf.math.reduce_std(first_channel, axis=1, keepdims=True)
 
         # Relative counts (i.e., divide by total number of counts in the map)?
         rel_counts = self._p.nn.hist["rel_counts"] if self.which == "histograms" else self._p.nn.ff["rel_counts"]
@@ -141,53 +144,45 @@ class HealpyGCNN:
         # Flatten (or if convolutions don't go all the way down to a single pixel: average over the pixels
         t = tf.reduce_mean(t, axis=1, keepdims=False)
 
-        # Append total counts?
+        # Append total counts and std?
         if pa["append_tot_counts"] and rel_counts:
             t = tf.concat([t, tf.math.log(tf.squeeze(tot_counts, 1)) / 2.302], axis=1)  # 2.3026 ~ log_e(10)
+        if pa["append_std"]:
+            t = tf.concat([t, tf.math.log(tf.squeeze(std, 1)) / 2.302], axis=1)
 
-        # If Earth Mover's pinball loss: append tau at this point
+        # If Earth Mover's pinball loss: append taus at this point
         # We use the scaling proposed by
         # github.com/facebookresearch/SingleModelUncertainty/blob/master/aleatoric/regression/joint_estimation.py
         if tau is not None:
+            # Copy along batch dimension for each tau and each flux_query value
+            n_copies = tf.shape(tau)[0] // tf.shape(t)[0]  # self._p.train["hist_n_taus"] * self._p.train["hist_n_flux_queries"]
+            t = tf.repeat(t, repeats=n_copies, axis=0)  # (n_batch * n_taus * n_flux_queries) x n_channels
+
+            # Concatenate the quantiles
             t = tf.concat([t, (tau - 0.5) * 12], axis=1)
 
             # Also append flux queries if needed
+            # NOTE: flux queries must have the same shape as tau!
             if normed_flux_queries is not None:
                 t = tf.concat([t, (normed_flux_queries - 0.5) * 12], axis=1)
-                monotonicity_constraints = tf.reduce_sum(t[:, -1 - len(self._p.nn.hist["hist_templates"]):], axis=-1,
-                                                         keepdims=True)
 
         # Fully-connected blocks
         # Note: batch norm is provided in a single array for conv. layers and FC layers!
         for il in range(len(pa["M"])):
-            constraint = False
-            do_groupsort = False
-            this_activation = pa["activation"]
-
-            if tau is not None and self._p.nn.hist["enforce_monotonicity"]:
-                this_activation = None
-                constraint = True
-                do_groupsort = True
-
             t = hp_nn.FullyConnectedBlock(Fout=pa["M"][il], use_bias=True,
                                           use_bn=pa['batch_norm'][len(pa["F"]) + il],
-                                          activation=this_activation, constraint=constraint, do_groupsort=do_groupsort)(t)
+                                          activation=pa["activation"])(t)
 
         # Final fully-connected layer without activation
-        if self._p.nn.hist["enforce_monotonicity"]:
-            t = hp_nn.ConstraintDense(self.dim_out_flat, use_bias=False, do_groupsort=False)(t)
-        else:
-            t = tf.keras.layers.Dense(self.dim_out_flat, use_bias=False)(t)
+        t = tf.keras.layers.Dense(self.dim_out_flat, use_bias=False)(t)
 
         # For histograms: reshape to n_batch x n_bins x n_hist_templates
         if self.which == "histograms":
             t = tf.keras.layers.Lambda(lambda x: tf.reshape(x, [tf.shape(x)[0], *self.dim_out]))(t)
 
         # Final layer: will be taken care of when building the model
-        kwargs_final = {}
-        if self._p.nn.hist["enforce_monotonicity"]:
-            kwargs_final["monotonicity_constraints"] = monotonicity_constraints
 
+        kwargs_final = {}
         out_dict = hp_nn.FinalLayer(which=self.which, params=self._p)(t, **kwargs_final)
 
         print("The resolution will be successively reduced from nside={:} to nside={:} during a forward pass.".format(

@@ -2,7 +2,6 @@ import numpy as np
 
 from .gnn_layers_customized import *
 from ...tf_ops import normalized_softplus, split_mean_var, split_mean_cov
-from .lipschitz_utils import GroupSort
 
 
 class HealpyPoolWithHoles(Layer):
@@ -406,15 +405,13 @@ class FullyConnectedBlock(Layer):
     """
     A fully-connected block.
     """
-    def __init__(self, Fout, initializer=None, activation=None, use_bias=False, use_bn=0, constraint=False, do_groupsort=False, **kwargs):
+    def __init__(self, Fout, initializer=None, activation=None, use_bias=False, use_bn=0, **kwargs):
         """
         Initializes the fully-connected block
         :param Fout: Number of features (channels) of the output
         :param initializer: initializer to use for weight initialisation
         :param activation: the activation function to use after the layer, defaults to linear
         :param use_bias: Use learnable bias weights
-        :param use_bn: Apply batch norm (1) or instance norm (2) before adding the bias (0 otherwise)
-        :param constraint: constrain the MaxNorm of the kernel?
         :param kwargs: additional keyword arguments passed on to tf.keras.Layer
         """
 
@@ -441,8 +438,6 @@ class FullyConnectedBlock(Layer):
 
         self.Fout = Fout
         self.kwargs = kwargs
-        self.constraint = constraint
-        self.do_groupsort = do_groupsort
 
     def build(self, input_shape):
         """
@@ -450,12 +445,7 @@ class FullyConnectedBlock(Layer):
         :param input_shape: shape of the input, batch dim has to be defined
         """
         kernel_initializer = "he_uniform" if self.initializer is None else self.initializer
-        if self.constraint:
-            # self.fc = tf.keras.layers.Dense(self.Fout, use_bias=self.use_bias, kernel_initializer=kernel_initializer)  # TODO!!! MONOTONIC!
-            self.fc = ConstraintDense(self.Fout, kernel_initializer=kernel_initializer, do_groupsort=self.do_groupsort)
-
-        else:
-            self.fc = tf.keras.layers.Dense(self.Fout, use_bias=self.use_bias, kernel_initializer=kernel_initializer)
+        self.fc = tf.keras.layers.Dense(self.Fout, use_bias=self.use_bias, kernel_initializer=kernel_initializer)
 
     def call(self, input_tensor, *args, **kwargs):
         """
@@ -542,10 +532,6 @@ class FinalLayer(Layer):
 
         # Histogram submodel:
         else:
-            if self._p.nn.hist["enforce_monotonicity"]:
-                assert "monotonicity_constraints" in kwargs.keys()
-                x += 1.0 * kwargs["monotonicity_constraints"]  # TODO!!
-
             x = self.activation(x)
             output_dict["hist"] = x
         return output_dict
@@ -624,98 +610,3 @@ class PoissonResidualLayer(Layer):
 
         return count_maps_residual
 
-
-# Variant 1: with positive weights
-# class MonotonicDense(tf.keras.layers.Layer):
-#     def __init__(self, Fout, kernel_initializer=None, monotonic_inputs=0, use_bias=True, activation=None, use_bn=0,
-#                  **kwargs):
-#         super().__init__(**kwargs)
-#         self.Fout = Fout
-#         self.monotonic_inputs = monotonic_inputs
-#         self.initializer = "glorot_uniform" if kernel_initializer is None else kernel_initializer
-#         self.use_bias = use_bias
-#         self.use_bn = use_bn
-#
-#         if activation is None or callable(activation):
-#             self.activation = activation
-#         elif hasattr(tf.keras.activations, activation):
-#             self.activation = getattr(tf.keras.activations, activation)
-#         else:
-#             raise ValueError(f"Could not find activation <{activation}> in tf.keras.activations...")
-#
-#     def build(self, input_shape):
-#         super().build(input_shape)
-#         self.kernel = self.add_weight(name='kernel', shape=(input_shape[-1], self.Fout),
-#                                       trainable=True,
-#                                       constraint=lambda w: tf.where(tf.tile(tf.range(input_shape[1])[:, None],
-#                                                                             (1, w.shape[1]))
-#                                                                     > input_shape[1] - self.monotonic_inputs,
-#                                                                     tf.keras.constraints.NonNeg()(w),
-#                                                                     tf.keras.constraints.Constraint()(w)))
-#         # initially, need to manually apply a ReLU because initializer has priority over constraints
-#         w_raw = self.get_weights()[0]
-#         w_raw[-self.monotonic_inputs:, :] = np.clip(w_raw[-self.monotonic_inputs:, :], 0, np.infty)
-#         self.set_weights([w_raw])
-#
-#         if self.use_bias:
-#             self.bias = self.add_weight(name='bias', shape=(self.Fout,), initializer='zeros', trainable=True)
-#
-#     def call(self, inputs):
-#         output = tf.matmul(inputs, self.kernel)
-#
-#         if self.use_bias:
-#             output = tf.nn.bias_add(output, self.bias)
-#
-#         if self.use_bn == 1:
-#             output = self.bn(output)
-#         elif self.use_bn == 2:
-#             output = self.inst_norm(output)
-#
-#         if self.activation is not None:
-#             output = self.activation(output)
-#
-#         return output
-
-# Variant 2: with Lipschitz constraint
-class ConstraintDense(tf.keras.layers.Layer):
-    def __init__(self, Fout, kernel_initializer=None, use_bias=True, do_groupsort=False, **kwargs):
-        super().__init__(**kwargs)
-        self.Fout = Fout
-        self.initializer = "he_uniform" if kernel_initializer is None else kernel_initializer
-        self.use_bias = use_bias
-        self.do_groupsort = do_groupsort
-
-    def build(self, input_shape):
-        super().build(input_shape)
-        self.kernel = self.add_weight(name='kernel', shape=(input_shape[-1], self.Fout),
-                                      trainable=True,
-                                      constraint=NormalizeWeights(max_norm=1.0))  # TODO!!!
-        # self.kernel = NormalizeWeights(max_norm=np.infty)(self.kernel)  # need to normalize it manually once  # TODO
-
-        if self.use_bias:
-            self.bias = self.add_weight(name='bias', shape=(self.Fout,), initializer='zeros', trainable=True)
-
-    def call(self, inputs):
-        output = tf.matmul(inputs, self.kernel)
-
-        if self.use_bias:
-            output = tf.nn.bias_add(output, self.bias)
-
-        if self.do_groupsort:
-            output = GroupSort(n_groups=64)(output)  # TODO
-            # output = tf.nn.relu(output)  # TODO!!
-        return output
-
-
-
-# Lipschitz constraint (from https://github.com/niklasnolte/MonotoneNorm/blob/main/monotonenorm/functional.py)
-class NormalizeWeights(tf.keras.constraints.Constraint):
-    def __init__(self, max_norm=1.0):
-        self.max_norm = max_norm
-    def __call__(self, w):
-        norms = tf.reduce_sum(tf.abs(w), axis=1, keepdims=True)  # NOTE: the weights are transposed in comparison to niklasnolte implementation!
-        norms = tf.maximum(tf.ones_like(norms), norms / self.max_norm)
-        return w / tf.maximum(norms, tf.ones_like(norms))
-
-    def get_config(self):
-        return {'max_norm': self.max_norm}

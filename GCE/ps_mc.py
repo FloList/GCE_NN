@@ -3,9 +3,12 @@
 # function. Can save result of simulation to .npy file.
 # Modified from https://github.com/nickrodd/NPTFit-Sim/tree/master/NPTFit-Sim.
 ###############################################################################
+import sys
+import time
 import numpy as np
 import healpy as hp
 import scipy.stats as stats
+# import warnings
 
 
 # Random upscaling:
@@ -183,9 +186,26 @@ def make_map(flux_arr, temp, exp, pdf_psf_sampler, upscale_nside=16384, verbose=
     num_phot = np.random.poisson(flux_arr * exp[pix_ps])
 
     # if actual ROI is subset: set flux array of the PSs in the ROI, as well as num_phot
+    # if use_numba:
+    #     @numba.njit
+    #     def get_inds_ps_not_in_roi(inds_ps, inds_outside_roi):
+    #         out = []
+    #         for counter, ind in enumerate(inds_ps):
+    #             if ind in inds_outside_roi:
+    #                 out.append(counter)
+    #         return np.asarray(out)
+    #
+    #     with warnings.catch_warnings():
+    #         warnings.simplefilter("ignore")  # using sets in Numba is deprecated and will eventually be replaced by numba.typed.Set
+    #         # https://numba.readthedocs.io/en/stable/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
+    #         inds_ps_not_in_roi = get_inds_ps_not_in_roi(inds_ps, inds_outside_roi)
+    #
+    # else:
+    # Fallback if Numba is not available
     # NOTE: inds_outside_roi should be a SET, gives great speed-up for member search!
+    inds_ps_not_in_roi = np.asarray([counter for (counter, ind) in enumerate(inds_ps) if ind in inds_outside_roi])
+
     if inds_outside_roi is not None:
-        inds_ps_not_in_roi = np.asarray([counter for (counter, ind) in enumerate(inds_ps) if ind in inds_outside_roi])
         if len(inds_ps_not_in_roi) > 0:
             flux_arr_in_roi = np.delete(flux_arr, inds_ps_not_in_roi)
             num_phot_in_roi = np.delete(num_phot, inds_ps_not_in_roi)
@@ -271,6 +291,18 @@ def make_map(flux_arr, temp, exp, pdf_psf_sampler, upscale_nside=16384, verbose=
                 flux_arr_return = flux_arr
 
     # Add all the counts: note: use "at" such that multiple counts in a pixel are added
+    # if use_numba:
+    #     @numba.njit
+    #     def add_fun(m, p):
+    #         for pp in p:
+    #             m[pp] += 1
+    #         return m
+    #
+    #     map_arr = add_fun(map_arr, posit)
+    #     map_arr_no_psf = add_fun(map_arr_no_psf, pix_counts)
+    #
+    # else:
+    # Fallback without Numba
     np.add.at(map_arr, posit, int(1))  # pixels AFTER PSF
     np.add.at(map_arr_no_psf, pix_counts, int(1))  # pixels BEFORE PSF
 

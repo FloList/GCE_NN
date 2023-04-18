@@ -25,6 +25,11 @@ from .nn import losses
 from .plots import plot_flux_fractions, plot_histograms, plot_maps
 
 
+# TODO:
+# * for dN/dF labels: take CDF of true underlying skew normal dist. instead of histograms (although: how to deal with multiple populations?)
+# * add checks for continuous dN/dF
+
+
 class Analysis:
     def __init__(self):
         """
@@ -685,15 +690,13 @@ class Analysis:
                 if which != "histograms":
                     tau = median_tau
                 elif self.p.train["hist_tau_prior"] == "uniform":
-                    tau = tau_dist.sample((data_.shape[0], 1))
+                    tau = tau_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))  # n_batch x n_taus x n_flux_queries
                 elif self.p.train["hist_tau_prior"] == "uniform_in_z":
-                    z_vals = z_dist.sample((data_.shape[0], 1))
+                    z_vals = z_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))
                     tau = norm_dist.cdf(z_vals)
 
                 if self.p.nn.hist["continuous"]:
-                    # draw normalized flux values in (0, 1)
-                    normed_flux_queries = normed_flux_query_dist.sample((data_.shape[0],
-                                                                         len(self.p.nn.hist["hist_templates"])))
+                    normed_flux_queries = normed_flux_query_dist.sample((data_.shape[0] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))   # TODO: CHECK IF IT'S BETTER TO TAKE THE SAME FLUX VALUES ALL MAPS
                     nn_input = [data_, tau, normed_flux_queries]
                 else:
                     nn_input = [data_, tau]
@@ -704,7 +707,8 @@ class Analysis:
         # Loss helper function
         def get_loss(data_, label_, global_size, training):
             nn_input = get_nn_input(data_)
-            return tf.reduce_sum(loss(label_, *[self.nn(nn_input, training=training)[k] for k in loss_keys]), 0) \
+            nn_output = self.nn(nn_input, training=training)
+            return tf.reduce_sum(loss(label_, *[nn_output[k] for k in loss_keys]), 0) \
                    / global_size
 
         # Define training step
@@ -726,19 +730,19 @@ class Analysis:
 
         # Wrapper around get_loss that takes care of the replicas in case multiple GPUs are available
         # NOTE: this function should NOT be used in distributed train step because gradients need to go inside strategy
-        @tf.function  # TODO
+        @tf.function
         def distributed_get_loss(data_, label_, global_size, training):
             per_replica_losses = self._strategy.run(get_loss, args=(data_, label_, global_size, training))
             return self._strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses, axis=None)
 
         # Wrapper around train_step that takes care of the replicas in case multiple GPUs are available
-        @tf.function  # TODO
+        @tf.function
         def distributed_train_step(data_, label_, global_size):
             per_replica_losses = self._strategy.run(train_step, args=(data_, label_, global_size))
             return self._strategy.reduce(tf.distribute.ReduceOp.SUM, per_replica_losses, axis=None)
 
         # Wrapper around get_metrics that takes care of the replicas in case multiple GPUs are available
-        @tf.function  # TODO
+        @tf.function
         def distributed_get_metrics(data_, label_, global_size, training=False):
             per_replica_metrics = self._strategy.run(get_metrics, args=(data_, label_, global_size, training))
             return [self._strategy.reduce(tf.distribute.ReduceOp.SUM, metric, axis=None)
@@ -771,7 +775,7 @@ class Analysis:
                 global_step = optimizer.iterations.numpy()
                 data = s["data"]
                 labels = s["label"][label_ind]
-                loss_eval = distributed_train_step(data, labels, global_size=global_size_train)
+                loss_eval = distributed_train_step(data, labels, global_size=global_size_train, extra_dict=extra_dict)
                 pbar.set_postfix(train_loss=loss_eval.numpy(), refresh=False)
 
                 # Is it an evaluation step?
@@ -782,7 +786,7 @@ class Analysis:
                     # Evaluate
                     with summary_writer.as_default():
                         # TF behavior changed!
-                        if int(tf.__version__[2]) >= 11:
+                        if int(tf.__version__.split(".")[1]) >= 11:
                             lr_summary = optimizer.learning_rate
                         else:
                             lr_summary = optimizer.learning_rate(global_step)

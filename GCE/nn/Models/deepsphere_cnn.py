@@ -57,7 +57,7 @@ class DeepsphereCNN:
                     tau = tf.keras.Input(shape=1)
 
                     if self._p.nn.hist["continuous"]:
-                        normed_flux_queries = tf.keras.Input(shape=len(self._p.nn.hist["hist_templates"]))
+                        normed_flux_queries = tf.keras.Input(shape=1)
 
                 model_hist = HealpyGCNN(which="histograms", params=self._p, index_dict=self._index_dict)
                 model_hist_outdict, _ = model_hist.compute_output(input_tensor=hist_nn_input, tau=tau,

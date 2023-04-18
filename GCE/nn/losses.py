@@ -54,11 +54,12 @@ def get_loss_and_keys_flux_fractions(ff_loss_str, do_var=False, do_covar=False):
     return loss, loss_keys
 
 
-def get_loss_and_keys_histograms(hist_loss_str, smoothing_empl=None):
+def get_loss_and_keys_histograms(hist_loss_str, smoothing_empl=None, lambda_sharpness=None):
     """
     Returns the loss function for the SCD histogram estimation.
     :param hist_loss_str: string specifying histogram loss
     :param smoothing_empl: scalar determining the smoothing for Earth Mover's Pinball loss
+    :param lambda_sharpness: scalar determining the importance of sharpness for the calibration loss
     :return: loss function, list of keys required (apart from true label, which is always assumed to be first input)
     """
     loss_keys = ["hist"]
@@ -82,8 +83,11 @@ def get_loss_and_keys_histograms(hist_loss_str, smoothing_empl=None):
             return empl_continuous(y_true, y_pred, tau, normed_flux_queries=normed_flux_queries,
                                    smoothing=smoothing_empl)
         loss_keys += ["tau", "f_query"]
-    else:
-        raise NotImplementedError
+    # elif hist_loss_str.lower() == "cali_continuous":
+    #     def loss(y_true, y_pred, tau, normed_flux_queries):
+    #         return cali_continuous(y_true, y_pred, tau, normed_flux_queries)  # TODO!!!
+    # else:
+    #     raise NotImplementedError
     return loss, loss_keys
 
 
@@ -226,13 +230,23 @@ def empl_continuous(y_true, y_pred, tau, normed_flux_queries, weights=None, smoo
     :param normed_flux_queries: normed flux queries in (0, 1) for each template
     :param weights: weight the loss differently for different samples
     :param smoothing: scalar >= 0 that determines smoothing of loss function around 0
-    :return Earth Mover's Pinball Loss
-    # TODO: TRY OUT WITH >1 TEMPLATES!
+    :return continuous Earth Mover's Pinball Loss
     """
-    batch_inds = tf.range(y_true.shape[0], dtype=tf.int32)[:, None]
-    query_inds = tf.cast(tf.math.floor(normed_flux_queries * y_true.shape[1]), tf.int32)
-    ecdf_true_all = tf.math.cumsum(y_true, axis=1)
-    ecdf_true = tf.squeeze(tf.gather_nd(ecdf_true_all, tf.stack((batch_inds, query_inds), -1)), -1)
+    # Define all shapes
+    n_bins_stored = y_true.shape[1]
+    n_batch = y_true.shape[0]
+
+    query_inds = tf.cast(tf.math.floor(normed_flux_queries * n_bins_stored), tf.int32)
+    query_inds_reshaped = tf.reshape(query_inds, (n_batch, -1))  # n_batch x (n_taus x n_flux_queries)
+    n_taus_times_flux_queries = query_inds_reshaped.shape[1]
+
+    ecdf_true_all = tf.math.cumsum(y_true, axis=1)  # n_batch x n_bins_total x n_hist_templates
+    batch_inds = tf.tile(tf.range(n_batch, dtype=tf.int32)[:, None], (1, n_taus_times_flux_queries))
+    ecdf_true_reshaped = tf.gather_nd(ecdf_true_all, tf.stack((batch_inds, query_inds_reshaped), -1))  # n_batch x (n_taus * n_flux_queries) x n_hist_templates
+    ecdf_true = tf.reshape(ecdf_true_reshaped, (n_batch * n_taus_times_flux_queries, -1))
+    # ecdf_true = tf.squeeze(tf.gather_nd(ecdf_true_all, tf.stack((batch_inds, query_inds), -1)), -1)  # if f_query has shape n_f_queries x n_hist_templates (i.e. different flux queries for different templates)
+    # ecdf_true = ecdf_true_all[:, tf.squeeze(query_inds, -1), :]
+
     ecdf_pred = y_pred[:, 0, :]
     delta = ecdf_pred - ecdf_true
 
@@ -257,3 +271,74 @@ def empl_continuous(y_true, y_pred, tau, normed_flux_queries, weights=None, smoo
 
     # avg. the weighted loss over the bins (1) and channel dimension (2)
     return tf.reduce_mean(loss * weights, [1, 2])
+
+
+# def cali_continuous(y_true, y_pred, tau, normed_flux_queries, lambda_sharpness):
+#     """
+#     Compute the calibration + sharpness loss from https://arxiv.org/pdf/2011.09588.pdf
+#     :param y_true: label
+#     :param y_pred: prediction
+#     :param tau: quantile levels of interest
+#     :param normed_flux_queries: normed flux queries in (0, 1) for each template
+#     :param lambda_sharpness: weighting of the sharpness term
+#     :return weighted calibration + sharpness loss
+#     """
+#     batch_inds = tf.range(y_true.shape[0], dtype=tf.int32)[:, None]
+#     query_inds = tf.cast(tf.math.floor(normed_flux_queries * y_true.shape[1]), tf.int32)
+#     ecdf_true_all = tf.math.cumsum(y_true, axis=1)
+#     ecdf_true = tf.squeeze(tf.gather_nd(ecdf_true_all, tf.stack((batch_inds, query_inds), -1)), -1)
+#     ecdf_pred = y_pred[:, 0, :]
+#
+#     num_pts = y_true.shape[0]
+#     idx_under = tf.less_equal(ecdf_true, ecdf_pred)
+#     idx_over = tf.logical_not(idx_under)
+#     coverage = tf.reduce_mean(tf.cast(idx_under, tf.float32), axis=1)
+#
+#     pred_y_mat = tf.reshape(pred_y, [num_q, num_pts])
+#     diff_mat = y_mat - pred_y_mat
+#
+#     mean_diff_under = tf.reduce_mean(-1 * diff_mat * tf.cast(idx_under, tf.float32), axis=1)
+#     mean_diff_over = tf.reduce_mean(diff_mat * tf.cast(idx_over, tf.float32), axis=1)
+#
+#     cov_under = coverage < q_list
+#     cov_over = tf.logical_not(cov_under)
+#     loss_list = (cov_under * mean_diff_over) + (cov_over * mean_diff_under)
+#
+#     # handle scaling
+#     if args.scale is not None and args.scale:
+#         cov_diff = tf.abs(coverage - q_list)
+#         loss_list = cov_diff * loss_list
+#         loss = tf.reduce_mean(loss_list)
+#     else:
+#         loss = tf.reduce_mean(loss_list)
+#
+#     # handle sharpness penalty
+#     if args.sharp_penalty is not None:
+#         assert isinstance(args.sharp_penalty, float)
+#
+#         # make input for corresponding opposite q
+#         if x is None:
+#             opp_q_model_in = 1.0 - q_rep
+#         else:
+#             opp_q_model_in = tf.concat([x_stacked, (1.0 - q_rep)], axis=1)
+#         opp_pred_y = model(opp_q_model_in)
+#
+#         below_med = q_rep <= 0.5
+#         above_med = tf.logical_not(below_med)
+#
+#         sharp_penalty = below_med * (opp_pred_y - pred_y) + above_med * (pred_y - opp_pred_y)
+#         width_positive = tf.greater(sharp_penalty, 0.0)
+#
+#         # penalize sharpness only if centered interval obs props is too high
+#         if hasattr(args, "sharp_all") and args.sharp_all:
+#             sharp_penalty = tf.cast(width_positive, tf.float32) * sharp_penalty
+#         else:
+#             opp_pred_y_mat = tf.reshape(opp_pred_y, [num_q, num_pts])
+#             below_med_mat = tf.reshape(below_med, [num_q, num_pts])
+#             exp_interval_props = tf.abs((2 * q_list) - 1)
+#
+#             interval_lower_mat = below_med_mat * pred_y_mat + tf.logical_not(below_med_mat) * opp_pred_y_mat
+#             interval_upper_mat = tf.logical_not(below_med_mat) * pred_y_mat + below_med_mat * opp_pred_y_mat
+#
+#
+#     return loss
