@@ -18,7 +18,7 @@ gce.print_params()
 # gce.combine_template_maps(save_filenames=True, do_combine=True)
 # sys.exit(0)
 
-gce.delete_run(confirm=False)
+# gce.delete_run(confirm=False)
 gce.build_pipeline()
 gce.build_nn()
 gce.train_nn("histograms")

@@ -598,6 +598,10 @@ class Analysis:
         global_size_train = self.p.train["batch_size"]
         global_size_val = self.p.train["batch_size_val"]
 
+        if self.p.nn.hist["continuous"]:
+            global_size_train *= self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"]
+            global_size_val *= self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"]
+
         # Define file writer, checkpoint, and checkpoint managers
         summaries_folder_str = "summaries_folder_hist" if which == "histograms" else "summaries_folder_ff"
         summary_writer = tf.summary.create_file_writer(self.p.nn[summaries_folder_str])
@@ -696,7 +700,11 @@ class Analysis:
                     tau = norm_dist.cdf(z_vals)
 
                 if self.p.nn.hist["continuous"]:
-                    normed_flux_queries = normed_flux_query_dist.sample((data_.shape[0] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))   # TODO: CHECK IF IT'S BETTER TO TAKE THE SAME FLUX VALUES ALL MAPS
+                    normed_flux_queries_raw = normed_flux_query_dist.sample((data_.shape[0] * self.p.train["hist_n_flux_queries"], 1))   # TODO: CHECK IF IT'S BETTER TO TAKE THE SAME FLUX VALUES ALL MAPS
+                    normed_flux_queries = tf.reshape(tf.tile(tf.reshape(normed_flux_queries_raw,
+                                                                        (data_.shape[0],
+                                                                         self.p.train["hist_n_flux_queries"], 1)),
+                                                             (1, 1, self.p.train["hist_n_taus"])), (-1, 1))
                     nn_input = [data_, tau, normed_flux_queries]
                 else:
                     nn_input = [data_, tau]
@@ -775,7 +783,7 @@ class Analysis:
                 global_step = optimizer.iterations.numpy()
                 data = s["data"]
                 labels = s["label"][label_ind]
-                loss_eval = distributed_train_step(data, labels, global_size=global_size_train, extra_dict=extra_dict)
+                loss_eval = distributed_train_step(data, labels, global_size=global_size_train)
                 pbar.set_postfix(train_loss=loss_eval.numpy(), refresh=False)
 
                 # Is it an evaluation step?
