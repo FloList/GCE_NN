@@ -1,9 +1,5 @@
 import torch
 
-jrll = torch.tensor([2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4], dtype=torch.int64)
-jpll = torch.tensor([1, 3, 5, 7, 0, 2, 4, 6, 1, 3, 5, 7], dtype=torch.int64)
-
-
 # pix2ang
 def pix2ang(ipix, nside):
     # NOTE: This assumes RING ordering!
@@ -50,8 +46,8 @@ def pix2ang(ipix, nside):
     phi_south = ((iphi_south - 0.5) * torch.pi / (2.0 * iring_south))
 
     # Combine results
-    theta = torch.zeros_like(ipix, dtype=torch.get_default_dtype())
-    phi = torch.zeros_like(ipix, dtype=torch.get_default_dtype())
+    theta = torch.zeros_like(ipix, dtype=torch.get_default_dtype(), device=ipix.device)
+    phi = torch.zeros_like(ipix, dtype=torch.get_default_dtype(), device=ipix.device)
 
     theta[condition_north_polar_cap] = theta_north
     phi[condition_north_polar_cap] = phi_north
@@ -67,7 +63,7 @@ def pix2ang(ipix, nside):
 
 # ang2pix
 def zphi2pix(nside, z, phi):
-    ipix1 = torch.zeros_like(z, dtype=torch.int64)
+    ipix1 = torch.zeros_like(z, dtype=torch.int64, device=z.device)
     tt = phi / (0.5 * torch.pi)  # in [0, 4]
     za = torch.abs(z)
     nl2 = 2 * nside
@@ -82,7 +78,9 @@ def zphi2pix(nside, z, phi):
 
     ir_equatorial = nside + 1 + jp_equatorial - jm_equatorial
 
-    kshift_equatorial = torch.where(ir_equatorial % 2 == 0, torch.tensor(1), torch.tensor(0))
+    kshift_equatorial = torch.where(ir_equatorial % 2 == 0,
+                                    torch.tensor(1, device=z.device),
+                                    torch.tensor(0, device=z.device))
 
     ip_equatorial = jp_equatorial + jm_equatorial - nside + kshift_equatorial + 1 + 2 * nl4
     ip_equatorial = torch.bitwise_and(torch.bitwise_right_shift(ip_equatorial, 1), (nl4 - 1)) + 1
@@ -123,34 +121,34 @@ def ang2pix(nside, theta, phi):
 # Bit compression
 def compress_bits(v):
     res = torch.bitwise_and(v,
-                            torch.tensor(0x5555555555555555, dtype=torch.int64))
+                            torch.tensor(0x5555555555555555, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_right_shift(res, 1)),
-                            torch.tensor(0x3333333333333333, dtype=torch.int64))
+                            torch.tensor(0x3333333333333333, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_right_shift(res, 2)),
-                            torch.tensor(0x0F0F0F0F0F0F0F0F, dtype=torch.int64))
+                            torch.tensor(0x0F0F0F0F0F0F0F0F, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_right_shift(res, 4)),
-                            torch.tensor(0x00FF00FF00FF00FF, dtype=torch.int64))
+                            torch.tensor(0x00FF00FF00FF00FF, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_right_shift(res, 8)),
-                            torch.tensor(0x0000FFFF0000FFFF, dtype=torch.int64))
+                            torch.tensor(0x0000FFFF0000FFFF, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_right_shift(res, 16)),
-                            torch.tensor(0x00000000FFFFFFFF, dtype=torch.int64))
+                            torch.tensor(0x00000000FFFFFFFF, dtype=torch.int64, device=v.device))
     return res
 
 
 # Bit spreading
 def spread_bits(v):
     res = torch.bitwise_and(v,
-                            torch.tensor(0xFFFFFFFF, dtype=torch.int64))
+                            torch.tensor(0xFFFFFFFF, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_left_shift(res, 16)),
-                            torch.tensor(0x0000FFFF0000FFFF, dtype=torch.int64))
+                            torch.tensor(0x0000FFFF0000FFFF, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_left_shift(res, 8)),
-                            torch.tensor(0x00FF00FF00FF00FF, dtype=torch.int64))
+                            torch.tensor(0x00FF00FF00FF00FF, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_left_shift(res, 4)),
-                            torch.tensor(0x0F0F0F0F0F0F0F0F, dtype=torch.int64))
+                            torch.tensor(0x0F0F0F0F0F0F0F0F, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_left_shift(res, 2)),
-                            torch.tensor(0x3333333333333333, dtype=torch.int64))
+                            torch.tensor(0x3333333333333333, dtype=torch.int64, device=v.device))
     res = torch.bitwise_and(torch.bitwise_xor(res, torch.bitwise_left_shift(res, 1)),
-                            torch.tensor(0x5555555555555555, dtype=torch.int64))
+                            torch.tensor(0x5555555555555555, dtype=torch.int64, device=v.device))
     return res
 
 
@@ -173,6 +171,9 @@ def nest2hpd(nside, pix):
 
 # Convert from HPD to ring
 def hpd2ring(nside, hpd):
+    jrll = torch.tensor([2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4], dtype=torch.int64, device=hpd.x.device)
+    jpll = torch.tensor([1, 3, 5, 7, 0, 2, 4, 6, 1, 3, 5, 7], dtype=torch.int64, device=hpd.x.device)
+
     nl4 = 4 * nside
     jr = (jrll[hpd.f] * nside) - hpd.x - hpd.y - 1
 
@@ -213,6 +214,9 @@ def isqrt(x):
 
 
 def ring2hpd(nside, pix):
+    jrll = torch.tensor([2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4], dtype=torch.int64, device=pix.device)
+    jpll = torch.tensor([1, 3, 5, 7, 0, 2, 4, 6, 1, 3, 5, 7], dtype=torch.int64, device=pix.device)
+
     ncap_ = 2 * nside * (nside - 1)
     npix_ = 12 * nside ** 2
 
@@ -280,6 +284,27 @@ def ring2nest(nside, ipring):
     return hpd2nest(nside, ring2hpd(nside, ipring))
 
 
+# Convert angle to vector
+def ang2vec(theta, phi):
+    if torch.any(theta < 0.0) or torch.any(theta > torch.pi):
+        raise ValueError("theta out of range [0., PI]")
+
+    stheta = torch.sin(theta)
+    x = stheta * torch.cos(phi)
+    y = stheta * torch.sin(phi)
+    z = torch.cos(theta)
+
+    v = torch.stack([x, y, z], dim=1)
+    return v
+
+
+# Convert vector to angle
+def vec2ang(v):
+    theta = torch.atan2(torch.hypot(v[:, 0], v[:, 1]), v[:, 2])
+    phi = torch.atan2(v[:, 1], v[:, 0])
+    return torch.stack([theta, phi], dim=1)
+
+
 if __name__ == "__main__":
     # TESTING
     import healpy as hp
@@ -314,3 +339,15 @@ if __name__ == "__main__":
     out_torch = ring2nest(nside_testing, torch.arange(hp.nside2npix(nside_testing)))
     out_hp = hp.ring2nest(nside_testing, np.arange(hp.nside2npix(nside_testing)))
     assert torch.all(out_torch == torch.from_numpy(out_hp)), "ring2nest does not agree with healpy.ring2nest!"
+
+    # Comparison of ang2vec
+    out_torch = ang2vec(theta, phi)
+    out_hp = hp.ang2vec(theta.numpy(), phi.numpy())
+    print("Max. difference in x: ", torch.max(torch.abs(out_torch[0] - out_hp[0])))
+    print("Max. difference in y: ", torch.max(torch.abs(out_torch[1] - out_hp[1])))
+
+    # Comparison of vec2ang
+    out_torch = vec2ang(out_torch)
+    out_hp = hp.vec2ang(out_hp)
+    print("Max. difference in theta: ", torch.max(torch.abs(out_torch[:, 0] - out_hp[0])))
+    print("Max. difference in phi: ", torch.max(torch.abs(out_torch[:, 1] - out_hp[1])))
