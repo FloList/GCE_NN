@@ -122,7 +122,7 @@ class Analysis:
         if "data" in self.p.keys():
             assert self.p.data["mask_type"] in [None, "None", "3FGL", "4FGL"], \
                 "Mask type not recognised!"
-            if isinstance(self.p.data["exposure"], str):
+            if isinstance(self.p.data["exposure"], str) and not "npy" in self.p.data["exposure"]:
                 assert self.p.data["exposure"] in ["Fermi", "Fermi_mean"], \
                     "Exposure not recognised!"
             assert hp.isnsideok(self.p.data["nside"]), "nside is not OK!"
@@ -340,11 +340,16 @@ class Analysis:
         fermi_folder = self.p.gen["fermi_folder"]
         inner_band = self.p.data["inner_band"]
         outer_rad = self.p.data["outer_rad"]
+        lon_min = self.p.data["lon_min"]
+        lon_max = self.p.data["lon_max"]
+        lat_min = self.p.data["lat_min"]
+        lat_max = self.p.data["lat_max"]
         nside = self.p.data["nside"]
 
         # Set up the mask for the ROI
         total_mask_neg = make_mask_total(band_mask=True, band_mask_range=inner_band, mask_ring=True, inner=0,
-                                         outer=outer_rad, nside=nside)
+                                         outer=outer_rad, nside=nside, l_deg_min=lon_min, l_deg_max=lon_max,
+                                         b_deg_min=lat_min, b_deg_max=lat_max, b_mask=True, l_mask=True)
 
         if self.p.data["mask_type"] == "3FGL":
             total_mask_neg = (1 - (1 - total_mask_neg)
@@ -364,7 +369,10 @@ class Analysis:
         if leakage_delta > 0:
             total_mask_neg_safety = make_mask_total(band_mask=True, band_mask_range=max(0, inner_band - leakage_delta),
                                                     mask_ring=True, inner=0, outer=outer_rad + leakage_delta,
-                                                    nside=nside)
+                                                    nside=nside,
+                                                    l_deg_min=lon_min - leakage_delta, l_deg_max=lon_max + leakage_delta,
+                                                    b_deg_min=lat_min - leakage_delta, b_deg_max=lat_max + leakage_delta,
+                                                    b_mask=True, l_mask=True)
         else:
             total_mask_neg_safety = total_mask_neg.copy()
 
@@ -381,11 +389,19 @@ class Analysis:
         temp_dict["indices_safety"] = indices_safety
 
         # Get exposure map
-        fermi_exp = hp.reorder(get_template(fermi_folder, "exp"), r2n=True)
+        if "npy" in self.p.data["exposure"]:
+            fermi_exp = hp.reorder(np.load(self.p.data["exposure"]), r2n=True)
+            # if it has an energy dimension: swap axes
+            if fermi_exp.ndim == 2:
+                fermi_exp = np.swapaxes(fermi_exp, 0, 1)
+        else:
+            fermi_exp = hp.reorder(get_template(fermi_folder, "exp"), r2n=True)
         fermi_exp_compressed = fermi_exp[indices_roi]
         fermi_mean_exp_roi = fermi_exp_compressed.mean()
 
-        if self.p.data["exposure"] == "Fermi":
+        if "npy" in self.p.data["exposure"]:
+            exp = fermi_exp.copy()  # NOTE: diffuse model has not yet been exposure corrected!
+        elif self.p.data["exposure"] == "Fermi":
             exp = fermi_exp.copy()
         elif self.p.data["exposure"] == "Fermi_mean":
             exp = np.ones_like(fermi_exp) * fermi_mean_exp_roi
@@ -422,10 +438,13 @@ class Analysis:
         # Now, store the templates
         for temp in t_p + t_ps:
             temp_p_name = temp[:-3] if "_PS" in temp else temp
-            t = hp.reorder(get_template(fermi_folder, temp_p_name), r2n=True)
+            smooth = "_PS" not in temp
+            t = hp.reorder(get_template(fermi_folder, temp_p_name, smooth=smooth), r2n=True)
+            if t.ndim == 2:
+                t = np.swapaxes(t, 0, 1)
 
             # if data has Fermi exposure
-            if self.p.data["exposure"] == "Fermi":
+            if self.p.data["exposure"] == "Fermi" or "npy" in self.p.data["exposure"]:
                 t_counts = t  # exposure-corrected template
                 t_flux = t_counts / temp_dict["fermi_rescale"]  # after removing the exposure correction
 
@@ -598,9 +617,9 @@ class Analysis:
         global_size_train = self.p.train["batch_size"]
         global_size_val = self.p.train["batch_size_val"]
 
-        if self.p.nn.hist["continuous"]:
-            global_size_train *= self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"]
-            global_size_val *= self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"]
+        # if self.p.nn.hist["continuous"]:
+        #     global_size_train *= self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"]
+        #     global_size_val *= self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"]
 
         # Define file writer, checkpoint, and checkpoint managers
         summaries_folder_str = "summaries_folder_hist" if which == "histograms" else "summaries_folder_ff"
@@ -685,8 +704,8 @@ class Analysis:
                     raise NotImplementedError(f"hist_tau_prior {self.p.train['hist_tau_prior']} unknown!")
 
                 # if flux queries need to be drawn for the continuous case
-                if self.p.nn.hist["continuous"]:
-                    normed_flux_query_dist = tfp.distributions.Uniform(low=0.0, high=1.0)
+                # if self.p.nn.hist["continuous"]:
+                #     normed_flux_query_dist = tfp.distributions.Uniform(low=0.0, high=1.0)
 
         # NN input helper function that takes care of quantile levels tau during training
         def get_nn_input(data_):
@@ -694,20 +713,28 @@ class Analysis:
                 if which != "histograms":
                     tau = median_tau
                 elif self.p.train["hist_tau_prior"] == "uniform":
-                    tau = tau_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))  # n_batch x n_taus x n_flux_queries
+                    if self.p.train["hist_same_tau_for_each_flux_query"]:
+                        tau_raw = tau_dist.sample((self.p.train["batch_size"], 1, self.p.train["hist_n_taus"]))  # n_batch x n_flux_queries
+                        tau = tf.reshape(tf.tile(tau_raw, (1, self.p.train["hist_n_flux_queries"], 1)), (-1, 1))
+                    else:
+                        tau = tau_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))  # n_batch * n_taus * n_flux_queries
                 elif self.p.train["hist_tau_prior"] == "uniform_in_z":
-                    z_vals = z_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))
+                    if self.p.train["hist_same_tau_for_each_flux_query"]:
+                        z_vals_raw = z_dist.sample((self.p.train["batch_size"], 1, self.p.train["hist_n_taus"]))
+                        z_vals = tf.reshape(tf.tile(z_vals_raw, (1, self.p.train["hist_n_flux_queries"], 1)), (-1, 1))
+                    else:
+                        z_vals = z_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))
                     tau = norm_dist.cdf(z_vals)
 
-                if self.p.nn.hist["continuous"]:
-                    normed_flux_queries_raw = normed_flux_query_dist.sample((data_.shape[0] * self.p.train["hist_n_flux_queries"], 1))   # TODO: CHECK IF IT'S BETTER TO TAKE THE SAME FLUX VALUES ALL MAPS
-                    normed_flux_queries = tf.reshape(tf.tile(tf.reshape(normed_flux_queries_raw,
-                                                                        (data_.shape[0],
-                                                                         self.p.train["hist_n_flux_queries"], 1)),
-                                                             (1, 1, self.p.train["hist_n_taus"])), (-1, 1))
-                    nn_input = [data_, tau, normed_flux_queries]
-                else:
-                    nn_input = [data_, tau]
+                # if self.p.nn.hist["continuous"]:
+                #     normed_flux_queries_raw = normed_flux_query_dist.sample((data_.shape[0] * self.p.train["hist_n_flux_queries"], 1))   # TODO: CHECK IF IT'S BETTER TO TAKE THE SAME FLUX VALUES ALL MAPS
+                #     normed_flux_queries = tf.reshape(tf.tile(tf.reshape(normed_flux_queries_raw,
+                #                                                         (data_.shape[0],
+                #                                                          self.p.train["hist_n_flux_queries"], 1)),
+                #                                              (1, 1, self.p.train["hist_n_taus"])), (-1, 1))
+                #     nn_input = [data_, tau, normed_flux_queries]
+                # else:
+                nn_input = [data_, tau]
             else:
                 nn_input = data_
             return nn_input
@@ -924,11 +951,11 @@ class Analysis:
             else:
                 if np.isscalar(tau):
                     tau = tau * np.ones((data.shape[0], 1))
-                if self.p.nn.hist["continuous"]:
-                    assert normed_flux_queries is not None, "Flux queries must be provided for continuous EMPL!"
-                    nn_input = [data, tau, normed_flux_queries]
-                else:
-                    nn_input = [data, tau]
+                # if self.p.nn.hist["continuous"]:
+                #     assert normed_flux_queries is not None, "Flux queries must be provided for continuous EMPL!"
+                #     nn_input = [data, tau, normed_flux_queries]
+                # else:
+                nn_input = [data, tau]
         else:
             nn_input = data
             if tau is not None:
@@ -946,10 +973,10 @@ class Analysis:
             outdict = {}
             for i_ql, ql in enumerate(tau):
                 this_ql = ql * np.ones((data.shape[0], 1))
-                if self.p.nn.hist["continuous"]:
-                    this_outdict = self.nn([data, this_ql, normed_flux_queries], training=training)
-                else:
-                    this_outdict = self.nn([data, this_ql], training=training)
+                # if self.p.nn.hist["continuous"]:
+                #     this_outdict = self.nn([data, this_ql, normed_flux_queries], training=training)
+                # else:
+                this_outdict = self.nn([data, this_ql], training=training)
 
                 for k in this_outdict.keys():
                     if k in ["tau", "hist", "f_query"]:

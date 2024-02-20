@@ -15,6 +15,23 @@ import time
 import warnings
 
 
+def get_spectrum_weights(params, temp, n_sim_per_chunk):
+    spectrum_dict = params.tt.priors_E
+    weights = np.nan
+    while np.any(np.isnan(weights)):
+        mean_draw = np.random.uniform(*spectrum_dict[temp]["mean_exp"], size=n_sim_per_chunk)
+        var_draw = spectrum_dict[temp]["var_exp"] * np.random.gamma(shape=spectrum_dict[temp]["var_gamma_shape"],
+                                                                    scale=spectrum_dict[temp]["var_gamma_scale"],
+                                                                    size=n_sim_per_chunk)
+        skew_draw = np.random.normal(loc=0, scale=spectrum_dict[temp]["skew_std"], size=n_sim_per_chunk)
+        bin_centers = 0.5 * (params.data.log_ebins[1:] + params.data.log_ebins[:-1])
+        weights = np.asarray(
+            [stats.skewnorm.pdf(bin_centers, a=skew_draw[i], loc=mean_draw[i], scale=np.sqrt(var_draw)[i]) for i in
+             range(n_sim_per_chunk)])
+        weights = weights / weights.sum(1)[:, None]
+    return weights
+
+
 def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job_id=0):
     """
     Generate simulated template maps for each template (output format: NESTED!)
@@ -33,6 +50,9 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
     nside = params.data["nside"]
     outer_rad = params.data["outer_rad"]
     inner_band = params.data["inner_band"]
+    lon_min, lon_max = params.data["lon_min"], params.data["lon_max"]
+    lat_min, lat_max = params.data["lat_min"], params.data["lat_max"]
+    log_ebins = params.data["log_ebins"]
     mask_type = params.data["mask_type"]
     do_fermi_psf = params.data["psf"]
     leakage_delta = params.data["leakage_delta"] if do_fermi_psf else 0
@@ -66,7 +86,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
 
     # PSF: use Fermi-LAT PSF
     if do_fermi_psf:
-        pdf = get_fermi_pdf_sampler()
+        pdf = get_fermi_pdf_sampler(file=params.data["psf_file"])
     else:
         pdf = None
 
@@ -96,8 +116,8 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
         indices_roi = temp_dict["indices_roi"]
 
         # Mask template and compress
-        t_masked = t * (1 - total_mask_neg)
-        t_masked_compressed = t_masked[indices_roi]
+        t_masked = t * (1 - total_mask_neg[:, None])
+        t_masked_compressed = t_masked[indices_roi, :]
 
         # Make a subfolder
         temp_folder = os.path.join(output_path, temp)
@@ -106,17 +126,19 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
         # For each chunk
         for chunk in range(n_chunk):
 
+            # Draw the spectrum
+            weights = get_spectrum_weights(params, temp, n_sim_per_chunk)
+
             # Draw the (log) amplitude
-            a = np.asarray([random.uniform(prior_dict[temp][0], prior_dict[temp][1])
-                            for _ in range(n_sim_per_chunk)])
+            a = np.asarray([random.uniform(prior_dict[temp][0], prior_dict[temp][1]) for _ in range(n_sim_per_chunk)])
 
             # Generate the maps: NOTE: exposure-correction is included in the Poissonian templates ("T_counts")
             random_draw_fn = np.random.poisson if do_poisson_scatter_p else lambda x: x
             if poisson_a_is_log:
-                sim_maps = np.asarray([random_draw_fn((10.0 ** a[i]) * t_masked_compressed)
+                sim_maps = np.asarray([random_draw_fn((10.0 ** a[i]) * weights[i, :] * t_masked_compressed)
                                        for i in range(n_sim_per_chunk)])
             else:
-                sim_maps = np.asarray([random_draw_fn(a[i] * t_masked_compressed)
+                sim_maps = np.asarray([random_draw_fn(a[i] * weights[i, :] * t_masked_compressed)
                                        for i in range(n_sim_per_chunk)])
 
             # Save settings
@@ -132,6 +154,11 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                 settings_out["mask_type"] = mask_type
                 settings_out["outer_rad"] = outer_rad
                 settings_out["inner_band"] = inner_band
+                settings_out["lon_min"] = lon_min
+                settings_out["lon_max"] = lon_max
+                settings_out["lat_min"] = lat_min
+                settings_out["lat_max"] = lat_max
+                settings_out["log_ebins"] = log_ebins
                 settings_out["leakage_delta"] = leakage_delta
                 settings_out["nside"] = nside
                 print("   Writing settings file...")
@@ -150,12 +177,12 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
             # Plot some maps and save
             if chunk == 0 and int(job_id) == 0 and save_example_plot:
                 plt.ioff()
-                hp.mollview(t_masked, title="Template (exposure-corrected)", nest=True)
-                hp.mollview(exp, title="Exposure (nside = " + str(nside) + ")", nest=True)
+                hp.mollview(t_masked.mean(1), title="Template (exposure-corrected)", nest=True)
+                hp.mollview(exp.mean(1), title="Exposure (nside = " + str(nside) + ")", nest=True)
                 hp.mollview(total_mask_neg, title="Mask (" + str(mask_type) + ")", nest=True)
                 for i in range(n_example_plots):
-                    hp.mollview(masked_to_full(sim_maps[i, :], indices_roi, nside=nside),
-                                title=int(np.round(sim_maps[i, :].sum())), nest=True)
+                    hp.mollview(masked_to_full(sim_maps[i, :, :].sum(-1), indices_roi, nside=nside),
+                                title=int(np.round(sim_maps[i, :, :].sum())), nest=True)
 
                 multipage(os.path.join(output_path, temp + "_examples.pdf"))
                 plt.close("all")
@@ -172,7 +199,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
 
         # Define a function for the simulation of the point-source models
         @ray.remote
-        def create_simulated_map(skew_, loc_, scale_, flux_lims_, enforce_upper_flux_, t_, exp_, pdf_, name_,
+        def create_simulated_map(skew_, loc_, scale_, weights_, flux_lims_, enforce_upper_flux_, t_, exp_, pdf_, name_,
                                  inds_outside_roi_, size_approx_mean_=10000, flux_log_=False):
             from .ps_mc import run
             assert np.all(np.isfinite(flux_lims_)), "Flux limits must be finite!"
@@ -203,9 +230,9 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                     n_sources = int(max(1, int(n_sources // 1.05)))
 
             # Do MC run
-            map_, n_phot_, flux_arr_out = run(np.asarray(flux_arr_), t_, exp_, pdf_, name_, save=False, getnopsf=True,
-                                              getcts=True, upscale_nside=16384, verbose=False, is_nest=True,
-                                              inds_outside_roi=inds_outside_roi_, clean_count_list=False)
+            map_, n_phot_, flux_arr_out = run(np.asarray(flux_arr_), t_, exp_, weights_, pdf_, name_, save=False,
+                                              getnopsf=True, getcts=True, upscale_nside=16384, verbose=False,
+                                              is_nest=True, inds_outside_roi=inds_outside_roi_, clean_count_list=False)
 
             return map_, n_phot_, flux_arr_out
 
@@ -215,10 +242,10 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
             t = temp_dict["T_flux"][temp]  # for point-sources: template after REMOVING the exposure correction is used
 
             # Apply slightly larger mask
-            t_masked = t * (1 - total_mask_neg_safety)
+            t_masked = t * (1 - total_mask_neg_safety[:, None])
 
             # Correct flux limit priors for larger mask (after simulating the counts, ROI mask will be applied)
-            flux_corr_fac = t_masked.sum() / (t * (1 - total_mask_neg)).sum()
+            flux_corr_fac = t_masked.sum() / (t * (1 - total_mask_neg[:, None])).sum()
             flux_lims_corr = [None] * 2
             for i in range(2):
                 if prior_dict[temp]["flux_log"]:
@@ -250,6 +277,9 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
             for chunk in range(this_n_chunk):
                 print("  Starting with chunk", chunk)
 
+                # Draw the spectrum
+                weights = get_spectrum_weights(params, temp, n_sim_per_chunk)
+
                 # Draw the parameters
                 mean_draw = np.random.uniform(*prior_dict[temp]["mean_exp"], size=n_sim_per_chunk)
                 var_draw = prior_dict[temp]["var_exp"] * np.random.chisquare(1, size=n_sim_per_chunk)
@@ -265,6 +295,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
 
                 sim_maps, n_phot, flux_arr = map(list, zip(*ray.get(
                     [create_simulated_map.remote(skew_draw[i_PS], mean_draw[i_PS], np.sqrt(var_draw[i_PS]),
+                                                 weights[i_PS],
                                                  flux_lims_corr, prior_dict[temp]["enforce_upper_flux"],
                                                  t_final_id, exp_id, pdf_id, "map_" + temp,
                                                  flux_log_=prior_dict[temp]["flux_log"],
@@ -272,7 +303,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                      for i_PS in range(n_sim_per_chunk)])))
 
                 # Apply ROI mask again and cut off counts outside ROI
-                sim_maps = np.asarray(sim_maps) * np.expand_dims((1 - total_mask_neg), [0, -1])
+                sim_maps = np.asarray(sim_maps) * (1 - total_mask_neg)[:, None, None]
 
                 # The following assert is for the scenario where there is NO leakage INTO the ROI, and counts leaking
                 # OUT OF the ROI are deleted from photon-count list n_phot
@@ -281,7 +312,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
 
                 # The following assert is for the scenario where there is leakage INTO and OUT OF the ROI, and n_phot
                 # contains ALL the counts (and only those counts) from PSs within the ROI.
-                assert np.all(sim_maps[:, :, 1].sum(1) == [n_phot[i].sum() for i in range(n_sim_per_chunk)]), \
+                assert np.all(sim_maps[:, :, :, 1].sum(-1).sum(1) == [n_phot[i].sum() for i in range(n_sim_per_chunk)]), \
                     "Photons counts in maps and n_phot lists are not consistent! Aborting..."
 
                 # Collect garbage
@@ -300,6 +331,11 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                     settings_out["mask_type"] = mask_type
                     settings_out["outer_rad"] = outer_rad
                     settings_out["inner_band"] = inner_band
+                    settings_out["lon_min"] = lon_min
+                    settings_out["lon_max"] = lon_max
+                    settings_out["lat_min"] = lat_min
+                    settings_out["lat_max"] = lat_max
+                    settings_out["log_ebins"] = log_ebins
                     settings_out["leakage_delta"] = leakage_delta
                     settings_out["nside"] = nside
                     print("   Writing settings file...")
@@ -307,7 +343,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                         pickle.dump(settings_out, f)
 
                 # Save maps
-                data_out["data"] = (sim_maps[:, temp_dict["indices_roi"], :]).astype(dtype_data)
+                data_out["data"] = (sim_maps[:, temp_dict["indices_roi"], :, :]).astype(dtype_data)
                 data_out["n_phot"] = n_phot
                 data_out["flux_arr"] = [np.asarray(f, dtype=dtype_flux_arr) for f in flux_arr]
                 data_out["info"] = dict()
@@ -323,12 +359,13 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                 # Plot some maps and save
                 if chunk == 0 and int(job_id) == 0 and save_example_plot:
                     plt.ioff()
-                    hp.mollview(t * (1 - total_mask_neg), title="Template (not exposure-corrected)", nest=True)
-                    hp.mollview(exp, title="Exposure (nside = " + str(nside) + ")", nest=True)
+                    hp.mollview(t.mean(1) * (1 - total_mask_neg), title="Template (not exposure-corrected)", nest=True)  # mean over E-bins
+                    hp.mollview(exp.mean(1), title="Exposure (nside = " + str(nside) + ")", nest=True)
                     hp.mollview(total_mask_neg, title="Mask (" + str(mask_type) + ")", nest=True)
                     hp.mollview(total_mask_neg_safety, title="Extended mask (allowing leakage into ROI)", nest=True)
                     for i in range(n_example_plots):
-                        hp.mollview(sim_maps[i, :, 0], title=int(np.round(sim_maps[i, :, 0].sum())), nest=True)
+                        hp.mollview(sim_maps[i, :, :, 0].sum(-1), title=int(np.round(sim_maps[i, :, :, 0].sum())),
+                                    nest=True)
 
                     multipage(os.path.join(output_path, temp + "_examples.pdf"))
                     plt.close("all")

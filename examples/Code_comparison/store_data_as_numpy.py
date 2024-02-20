@@ -62,12 +62,13 @@ ax.legend()
 
 # Store the PSF
 assert np.allclose(energies, psf_data["Energy"])
-np.savez(os.path.join(folder, outfolder, "psf_10_bins_300_angles.npz"),
-         psf=psf_data["Psf"], energies=energies, theta_rad=psf_theta_rad)
+# np.savez(os.path.join(folder, outfolder, "psf_10_bins_300_angles.npz"),
+#          psf=psf_data["Psf"], energies=energies, theta_rad=psf_theta_rad)
 
 # Now, load the count maps
 subfolders = ["diffE_isops_dNdS1", "diffE_isops_dNdS2", "diffE_isops_dNdS3"]
 for subfolder in subfolders:
+    print(f"Processing {subfolder}")
     count_map_file = os.path.join(folder, subfolder, "gtbin_out.fits")
 
     # Open the FITS file
@@ -81,6 +82,12 @@ for subfolder in subfolders:
     energy_max = energies_data["E_MAX"]
     assert np.allclose(energy_min[1:], energy_max[:-1])
     energy_boundaries = np.concatenate((energy_min[:1], energy_max))
-    np.save(os.path.join(folder, outfolder, f"count_map_{subfolder[-1]}_256.npy"), count_map)
+    # np.save(os.path.join(folder, outfolder, f"count_map_{subfolder[-1]}_256.npy"), count_map)
     hp.mollview(count_map[0], title="Count map at 2 GeV")
     hp.mollview(count_map[-1], title="Count map at 5 GeV")
+    hp.mollview(count_map.sum(0), title="Count map summed over all energies")
+    # Also print the total number of counts, and plot the spectrum
+    total_counts = np.sum(count_map, axis=(0, 1))
+    print("Total counts: ", total_counts)
+    plt.figure()
+    plt.plot(count_map.sum(1))

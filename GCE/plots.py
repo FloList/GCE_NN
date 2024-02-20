@@ -286,7 +286,7 @@ def plot_histograms(params, true_hists, preds, pdf=False, out_file="hist_plot.pd
                                                                y2=pred_hist[i_tau + 1, sample, :, i_ch].cumsum()[i],
                                                                color=colors[i_tau], lw=0)
                                 # If highest ~0 or lowest ~1: plot a line to make the prediction visible
-                                if i_tau == 0 and pred_hist[0, :, i_ch].cumsum()[i] > 1 - eps:
+                                if i_tau == 0 and pred_hist[0, sample, :, i_ch].cumsum()[i] > 1 - eps:
                                     ax.plot([bin_centers[i] - widths_l[i], bin_centers[i] + widths_r[i]],
                                                            2 * [1.0], color=colors[0], lw=2, zorder=3)
                                 elif i_tau == n_taus - 2 and pred_hist[-1, sample, :, i_ch].cumsum()[i] < eps:
