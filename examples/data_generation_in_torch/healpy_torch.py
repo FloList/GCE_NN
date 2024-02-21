@@ -1,3 +1,8 @@
+# Healpy functions in PyTorch, based on the following sources:
+#   * https://github.com/jankotek/HEALPix/blob/master/src/main/java/org/asterope/healpix/PixTools.java
+#   * https://github.com/ntessore/healpix/blob/main/src/healpix.c
+#   * https://github.com/ziotom78/Healpix.jl/blob/master/src/pixelfunc.jl
+
 import torch
 
 # pix2ang
@@ -61,7 +66,7 @@ def pix2ang(ipix, nside):
     return torch.stack([theta, phi], dim=1)
 
 
-# ang2pix
+# cylindrical to pix
 def zphi2pix(nside, z, phi):
     ipix1 = torch.zeros_like(z, dtype=torch.int64, device=z.device)
     tt = phi / (0.5 * torch.pi)  # in [0, 4]
@@ -104,6 +109,7 @@ def zphi2pix(nside, z, phi):
     return ipix1 - 1  # in [0, npix-1]
 
 
+# ang2pix
 def ang2pix(nside, theta, phi):
     if nside < 1:
         raise ValueError("Nside should be a power of 2 > 0")
@@ -305,8 +311,8 @@ def vec2ang(v):
     return torch.stack([theta, phi], dim=1)
 
 
+# TESTING
 if __name__ == "__main__":
-    # TESTING
     import healpy as hp
     import numpy as np
 
@@ -314,8 +320,8 @@ if __name__ == "__main__":
     nside_testing = 512
 
     # Comparison of ang2pix
-    theta_vec = torch.linspace(0.0, np.pi, 10)
-    phi_vec = torch.linspace(0.0, 2.0 * np.pi, 10)
+    theta_vec = torch.linspace(0.0, np.pi, 32)
+    phi_vec = torch.linspace(0.0, 2.0 * np.pi, 32)
     theta, phi = torch.meshgrid(theta_vec, phi_vec, indexing="ij")
     theta, phi = theta.flatten(), phi.flatten()
 
@@ -349,5 +355,8 @@ if __name__ == "__main__":
     # Comparison of vec2ang
     out_torch = vec2ang(out_torch)
     out_hp = hp.vec2ang(out_hp)
-    print("Max. difference in theta: ", torch.max(torch.abs(out_torch[:, 0] - out_hp[0])))
-    print("Max. difference in phi: ", torch.max(torch.abs(out_torch[:, 1] - out_hp[1])))
+    def dist_periodic(a, b, period):
+        return torch.minimum(torch.minimum(torch.abs(a - b), torch.abs(a - b + period)), torch.abs(a - b - period))
+
+    print("Max. difference in theta: ", torch.max(dist_periodic(out_torch[:, 0], out_hp[0], np.pi)))
+    print("Max. difference in phi: ", torch.max(dist_periodic(out_torch[:, 1], out_hp[1], 2.0 * np.pi)))

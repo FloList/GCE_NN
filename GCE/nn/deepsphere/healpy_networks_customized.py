@@ -27,16 +27,17 @@ class HealpyGCNN:
         self._ind_holes_to_ex = index_dict["ind_holes_to_ex"]
 
         if which == "flux_fractions":
-            dim_out = self._p.mod["n_models"]
+            dim_out = self._p.mod["n_models"] * (len(self._p.data["log_ebins"]) - 1)
             if self._p.nn.ff["alea_covar"]:
-                dim_out += dim_out * (dim_out + 1) // 2  # aleatoric uncertainty covariance matrix
+                # dim_out += dim_out * (dim_out + 1) // 2  # aleatoric uncertainty covariance matrix
+                raise NotImplementedError("Covariance matrix not implemented for >1 energy bins!")
             elif self._p.nn.ff["alea_var"]:
                 dim_out += dim_out  # aleatoric uncertainty variances
         elif which == "histograms":
-            if self._p.nn.hist["continuous"]:
-                dim_out = [1, self._p.nn["label_shape"][1][1]]  # only 1 number per PS template: 1 x n_templates
-            else:
-                dim_out = self._p.nn["label_shape"][1]  # n_bins x n_templates
+            # if self._p.nn.hist["continuous"]:
+            #     dim_out = [1, self._p.nn["label_shape"][1][1]]  # only 1 number per PS template: 1 x n_templates
+            # else:
+            dim_out = self._p.nn["label_shape"][1]  # n_bins x n_templates
         else:
             raise NotImplementedError
 
@@ -56,17 +57,13 @@ class HealpyGCNN:
 
 
         # If t has no channel dimension: add dimension
-        if len(input_tensor.shape) == 2:
-            first_channel = tf.expand_dims(input_tensor, -1)
+        if self.which == "histograms" and len(input_tensor.shape) == 4:
+            first_channel, other_channels = input_tensor[:, :, :, 0], input_tensor[:, :, :, 1]
+            need_concat = True
         else:
-            # If 2nd channel: split up raw input (1st channel) as no preprocessing needs to be done for the rest
-            if input_tensor.shape[2] > 1:
-                first_channel, other_channels = input_tensor[:, :, :1], input_tensor[:, :, 1:]
-                need_concat = True
-            else:
-                first_channel = input_tensor
+            first_channel = input_tensor
 
-        # Get total counts
+        # Get total counts (per energy bin)
         tot_counts = tf.reduce_sum(first_channel, axis=1, keepdims=True)
 
         # Get standard deviation
@@ -181,7 +178,6 @@ class HealpyGCNN:
             t = tf.keras.layers.Lambda(lambda x: tf.reshape(x, [tf.shape(x)[0], *self.dim_out]))(t)
 
         # Final layer: will be taken care of when building the model
-
         kwargs_final = {}
         out_dict = hp_nn.FinalLayer(which=self.which, params=self._p)(t, **kwargs_final)
 

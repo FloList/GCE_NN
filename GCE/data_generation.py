@@ -146,6 +146,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                 settings_out = dict()
                 settings_out["T"] = t
                 settings_out["priors"] = prior_dict[temp]
+                settings_out["priors_E"] = params.tt.priors_E[temp]
                 settings_out["is_log_A"] = poisson_a_is_log
                 settings_out["exp"] = exp
                 settings_out["rescale_compressed"] = rescale_compressed
@@ -323,6 +324,7 @@ def generate_template_maps(params, temp_dict, ray_settings, n_example_plots, job
                     settings_out = dict()
                     settings_out["T"] = t
                     settings_out["priors"] = prior_dict[temp]
+                    settings_out["priors_E"] = params.tt.priors_E[temp]
                     settings_out["exp"] = exp  # exposure
                     settings_out["rescale_compressed"] = rescale_compressed
                     settings_out["max_NP_sources"] = np.nan  # not set here

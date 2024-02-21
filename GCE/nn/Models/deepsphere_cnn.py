@@ -49,15 +49,14 @@ class DeepsphereCNN:
                     poissonian_residual = PoissonResidualLayer(self._p, self._template_dict)([
                         preprocessed_input, model_ff_outdict["ff_mean"]])
                     # in this case: feed input_tensor with Poissonian residual
-                    hist_nn_input = tf.concat([tf.expand_dims(input_tensor, 2),
-                                               tf.expand_dims(poissonian_residual, 2)], axis=2)  # 2nd channel: residual
+                    hist_nn_input = tf.stack([input_tensor, poissonian_residual], axis=-1)  # (batch, n_pix, n_bins, 2)
 
                 # Define tau input tensor here:
                 if "EMPL" in self._p.train["hist_loss"].upper():
                     tau = tf.keras.Input(shape=1)
 
-                    if self._p.nn.hist["continuous"]:
-                        normed_flux_queries = tf.keras.Input(shape=1)
+                    # if self._p.nn.hist["continuous"]:
+                    #     normed_flux_queries = tf.keras.Input(shape=1)
 
                 model_hist = HealpyGCNN(which="histograms", params=self._p, index_dict=self._index_dict)
                 model_hist_outdict, _ = model_hist.compute_output(input_tensor=hist_nn_input, tau=tau,
@@ -79,6 +78,7 @@ class DeepsphereCNN:
             model.summary()
 
             # Now: store trainable parameters for each submodel to enable flexible training
+            # TODO: THIS SEEMS TO BE BROKEN NOW, FIX (SEE FLO WOLF'S CODE!)
             trainable_weights_dict = {"ff": [], "hist": []}
             ff_hist_ind = 0 if self._p.nn.ff["return_ff"] else 1
 
@@ -96,6 +96,8 @@ class DeepsphereCNN:
                 if 'final_layer' in layer.name:
                     ff_hist_ind += 1
 
+            print(f"Trainable weights: {len(trainable_weights_dict['ff'])} for flux fractions, "
+                  f"{len(trainable_weights_dict['hist'])} for SCD histograms.")
             tot_weights_saved = len(trainable_weights_dict["ff"]) + len(trainable_weights_dict["hist"])
             assert tot_weights_saved == len(model.trainable_weights), \
                 "Expected to save {:} weights, but trainable_weights_dict contains {:} weights. Aborting...".format(

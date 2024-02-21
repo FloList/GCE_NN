@@ -219,6 +219,11 @@ def get_template(fermi_folder, temp, smooth=False):
         t = np.load(os.path.join(fermi_folder, "fermidata_counts.npy"))
     elif temp == "fermi_map":
         t = np.load(os.path.join(fermi_folder, "fermidata_counts.npy"))
+    elif temp == "dif_silvia":
+        if smooth:
+            t = np.load(os.path.join(fermi_folder, "template_diffuse_silvia_smooth.npy"))
+        else:
+            t = np.load(os.path.join(fermi_folder, "template_diffuse_silvia.npy"))
     else:
         raise NotImplementedError("Template", temp, "not available!")
     return t
@@ -249,10 +254,18 @@ def fermi_psf(r):
     return fermi_psf_inner(r)
 
 
-def get_fermi_pdf_sampler(n_points_f=int(1e6)):
-    f = np.linspace(0, np.pi, n_points_f)
-    pdf_psf = f * fermi_psf(f)
-    pdf = PDFSampler(f, pdf_psf)
+def get_fermi_pdf_sampler(n_points_f=int(1e6), file=None):
+    if file is not None:
+        psf_data = np.load(file)  # should have keys
+        assert all(k in psf_data.files for k in ["psf", "energies", "theta_rad"])
+        psf_values = psf_data["psf"]
+        psf_theta_rad = psf_data["theta_rad"]
+        pdf_psf = psf_theta_rad[None, :] * psf_values
+        pdf = [PDFSampler(psf_theta_rad, pdf_psf[i]) for i in range(len(psf_values))]
+    else:
+        f = np.linspace(0, np.pi, n_points_f)
+        pdf_psf = f * fermi_psf(f)
+        pdf = PDFSampler(f, pdf_psf)
     return pdf
 
 
@@ -295,9 +308,8 @@ def get_pixels(mask, nsides):
     :return: list of pixels for each entry of nsides
     """
     pixels = [None] * len(nsides)
-    pixels[-1] = np.argwhere(1 - mask).flatten()
 
-    for i in range(len(nsides) - 2, -1, -1):
+    for i in range(len(nsides) - 1, -1, -1):
         mask = np.asarray(hp.ud_grade(1.0 * mask, nside_out=nsides[i], order_in='NEST', order_out='NEST'))
         pixels[i] = np.argwhere(1 - mask).flatten()
 
@@ -337,24 +349,38 @@ def build_index_dict(params):
     # Set up the mask for the ROI
     inner_band = params.data["inner_band"]
     outer_rad = params.data["outer_rad"]
+    lon_min = params.data["lon_min"]
+    lon_max = params.data["lon_max"]
+    lat_min = params.data["lat_min"]
+    lat_max = params.data["lat_max"]
     nside = params.data["nside"]
     nsides = params.nn.arch["nsides"]
     roi = make_mask_total(band_mask=True, band_mask_range=inner_band, mask_ring=True, inner=0,
-                          outer=outer_rad, nside=nside)
+                          outer=outer_rad, nside=nside, l_mask=True, l_deg_min=lon_min, l_deg_max=lon_max,
+                          b_mask=True, b_deg_min=lat_min, b_deg_max=lat_max)
     if params.data["mask_type"] == "3FGL":
         roi = (1 - (1 - roi) * (1 - get_template(params.gen["fermi_folder"], "3FGL_mask"))).astype(bool)
     elif params.data["mask_type"] == "4FGL":
         roi = (1 - (1 - roi) * (1 - get_template(params.gen["fermi_folder"], "4FGL_mask"))).astype(bool)
     roi = hp.reorder(roi, r2n=True)
 
-    roi_extended = hp.reorder(make_mask_total(nside=1, mask_ring=True, inner=0,
-                                              outer=outer_rad), r2n=True)
+    roi_extended = hp.reorder(make_mask_total(nside=nside, mask_ring=True, inner=0,
+                                              outer=outer_rad,
+                                              l_mask=True, l_deg_min=lon_min, l_deg_max=lon_max,
+                                              b_mask=True, b_deg_min=lat_min, b_deg_max=lat_max), r2n=True)
     roi_dict = dict()
     roi_dict["indexes"] = get_pixels_with_holes(roi, nsides)
     roi_dict["indexes_extended"] = get_pixels(roi_extended, nsides)
     roi_dict["ind_holes_to_ex"] = [np.asarray([np.argwhere(roi_dict["indexes_extended"][i] == ind)[0][0]
                                                 for ind in roi_dict["indexes"][i]])
                                     for i in range(len(roi_dict["indexes"]))]
+
+    # Check correctness:
+    # for i, ns in enumerate(nsides):
+    #     mmm = np.zeros(hp.nside2npix(ns))
+    #     mmm[roi_dict["indexes_extended"][i]] = 1
+    #     mmm[roi_dict["indexes"][i]] = 2
+    #     hp.mollview(mmm, nest=True, title="nside = " + str(ns))
 
     return roi_dict
 

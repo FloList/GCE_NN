@@ -232,10 +232,11 @@ class Analysis:
                 self.p.nn.hist["n_bins"] = len(self.p.nn.hist["nn_hist_bins"]) - 1
                 len(self.p.nn.hist["hist_templates"])
                 n_bins = self.p.nn.hist["n_bins"]
-                self.p.nn["label_shape"] = [[self.p.mod["n_models"]], [n_bins, n_hist_templates]]
-                # flux fractions, SCD histograms
+                self.p.nn["label_shape"] = [[self.p.mod["n_models"], len(self.p.data["log_ebins"]) - 1],
+                                            [n_bins, n_hist_templates]]
+                # fluxes, SCD histograms
             else:
-                self.p.nn["label_shape"] = [[self.p.mod["n_models"]]]  # flux fractions
+                self.p.nn["label_shape"] = [[self.p.mod["n_models"], len(self.p.data["log_ebins"]) - 1]]  # fluxes
 
         # NN output keys
         if "nn" in self.p.keys():
@@ -546,7 +547,7 @@ class Analysis:
         for k in ["data_root", "models_root", "checkpoints_root", "summaries_root", "params_root", "figures_root"]:
             os.makedirs(self.p.gen[k], exist_ok=True)
         self.inds = build_index_dict(self.p)
-        self.p.nn["input_shape"] = len(self.inds["indexes"][0])
+        self.p.nn["input_shape"] = (len(self.inds["indexes"][0]), len(self.p.data["log_ebins"]) - 1)
         self.generators, self.datasets = build_pipeline(self.p)
         print("Input pipeline successfully built.")
 

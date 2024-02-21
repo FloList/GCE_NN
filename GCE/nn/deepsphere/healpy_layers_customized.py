@@ -523,7 +523,8 @@ class FinalLayer(Layer):
             # Aleatoric uncertainty variances
             elif self._p.nn.ff["alea_var"]:
                 output_dict["ff_mean"], output_dict["ff_logvar"] = split_mean_var(x, self.activation,
-                                                                                  self._p.mod["n_models"])
+                                                                                  self._p.mod["n_models"],
+                                                                                  len(self._p.data["log_ebins"]) - 1)
 
             # Only mean estimates
             else:
@@ -553,7 +554,7 @@ class PoissonResidualLayer(Layer):
         # Convert T_counts and counts-to-flux dict. to an array in the order of the models
         self.poiss_inds = np.argwhere([temp in params.mod["models_P"] for temp in params.mod["models"]]).flatten()
         self.t_counts_compressed_arr = np.asarray([temp_dict["T_counts"][temp] for temp in params.mod["models"]]
-                                                  ).astype(np.float32)[:, temp_dict["indices_roi"]]
+                                                  ).astype(np.float32)[:, temp_dict["indices_roi"], :]
         self.counts2flux_roi_arr = np.asarray([temp_dict["counts_to_flux_ratio_roi"][temp]
                                                for temp in params.mod["models"]]).astype(np.float32)
 
@@ -571,12 +572,9 @@ class PoissonResidualLayer(Layer):
         """
         preprocessed_input_maps, ff_mean = inputs
 
-        # Only 1 channel: squeeze
-        preprocessed_input_maps = tf.squeeze(preprocessed_input_maps, 2)
-
         # From flux fractions, get count fractions
         ff_sum = tf.reduce_sum(ff_mean, 1, keepdims=True)
-        count_fracs_unnorm = ff_mean * tf.expand_dims(self.counts2flux_roi_arr, 0)
+        count_fracs_unnorm = ff_mean *self.counts2flux_roi_arr[None, :, None]
         count_fracs = count_fracs_unnorm / (tf.reduce_sum(count_fracs_unnorm, axis=1, keepdims=True) / ff_sum)
 
         # Get counts per template
@@ -589,18 +587,18 @@ class PoissonResidualLayer(Layer):
         counts_per_temp = total_counts * count_fracs
 
         # Get ratio between counts per template and template sum
-        t_counts_rescale_fac = counts_per_temp / tf.reduce_sum(self.t_counts_compressed_arr.T.astype(np.float32),
-                                                               0, keepdims=True)
+        t_counts_rescale_fac = counts_per_temp / tf.reduce_sum(self.t_counts_compressed_arr.astype(np.float32),
+                                                               1, keepdims=False)[None, :]
 
-        # Best-fit count maps per template: n_batch x n_models x n_pix
-        count_maps_modelled_per_temp = tf.einsum('ij,jk->ijk', t_counts_rescale_fac, self.t_counts_compressed_arr)
+        # Best-fit count maps per template: n_batch x n_models x n_pix x n_bins
+        count_maps_modelled_per_temp = tf.einsum('ije,jke->ijke', t_counts_rescale_fac, self.t_counts_compressed_arr)
 
         # Sum over the Poissonian models
         count_maps_modelled_poiss = tf.reduce_sum(tf.gather(count_maps_modelled_per_temp, indices=self.poiss_inds,
                                                             axis=1), 1)
 
-        # Calculate the residual
-        count_maps_residual_raw = count_maps - count_maps_modelled_poiss  # 1 channel
+        # Calculate the residual, separately for each energy bin
+        count_maps_residual_raw = count_maps - count_maps_modelled_poiss
 
         # If needed: remove exposure again
         if self.remove_exp:

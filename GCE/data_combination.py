@@ -146,7 +146,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
             test_files_dict = pickle.load(open(os.path.join(output_path, "filenames_combined_test.pickle"), "rb"))
             settings_dict = pickle.load(open(os.path.join(output_path, "settings_combined.pickle"), "rb"))
         except (EOFError, IOError, FileNotFoundError):
-            print("Run this script with save_filenames=True first!")
+            print("Run this function with save_filenames=True first!")
             sys.exit(1)
 
     # Get exposure and unmasked pixels
@@ -222,7 +222,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
         if tvt == 0:
             if int(job_id) == 0:
                 settings_dict_comb = dict()
-                all_keys = ["T", "T_corr", "priors", "max_NP_sources"]
+                all_keys = ["T", "T_corr", "priors", "priors_E", "max_NP_sources"]
                 for key in all_keys:
                     temp_dict = dict()
                     for temp in t_p + t_ps:
@@ -287,7 +287,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                 print("File", i_file, "exists... continue")
                 continue
             total_flux_dict = dict()
-            flux_fraction_dict = dict()
+            flux_fraction_dict = dict()  # only for printing
             data_dict = dict()
             data_dict_0, data_dict_1 = dict(), dict()
             data_out = dict()
@@ -315,8 +315,8 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                         # Load data
                         data_dict[temp] = temp_data
                     # If PS map with second channel for data without PSF: extract desired channel
-                    if len(temp_map.shape) == 3:
-                        temp_map = temp_map[:, :, i_channel_select]
+                    if (temp in t_ps) and (len(temp_map.shape) == 4):
+                        temp_map = temp_map[:, :, :, i_channel_select]
                     # Add to combined map
                     combined_map += temp_map
                     # Calculate flux
@@ -324,7 +324,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                     # Total flux of template: sum over pixels
                     total_flux_dict[temp] += flux.sum(1)
 
-            # Calculate flux fractions
+            # Calculate flux
             total_flux = np.asarray([v for k, v in total_flux_dict.items()]).sum(0)
             for temp in t_p + t_ps:
                 flux_fraction_dict[temp] = total_flux_dict[temp] / total_flux
@@ -352,7 +352,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
 
             # Store in "data_out" dictionary
             data_out["data"] = combined_map.T
-            data_out["flux_fraction"] = flux_fraction_dict
+            data_out["flux"] = total_flux_dict
             data_out["info"] = info_dict_comb
 
             # Now: compute histograms
@@ -399,11 +399,12 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                         if "n_phot" not in dd_check[hist_template].keys():
                             raise RuntimeError("Error! GCE PS data does NOT contain photon count lists! Aborting!")
                         if is_add_two:
-                            hist_input = [np.hstack([data_dict_0[hist_template]["n_phot"][i],
-                                                     data_dict_1[hist_template]["n_phot"][i]])
-                                            for i in range(n_maps_per_file)]
+                            hist_input = [
+                                np.hstack([data_dict_0[hist_template]["n_phot"][i].sum(-1),  # sum over energies
+                                          data_dict_1[hist_template]["n_phot"][i].sum(-1)])
+                                for i in range(n_maps_per_file)]
                         else:
-                            hist_input = data_dict[hist_template]["n_phot"]
+                            hist_input = [data_dict[hist_template]["n_phot"][i].sum(-1) for i in range(n_maps_per_file)]
                         counts_per_ps_hist = np.asarray([np.histogram(hist_input[i], weights=hist_input[i],
                                                                       bins=bins_counts_per_ps)[0]
                                                          for i in range(n_maps_per_file)])
@@ -413,15 +414,17 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
 
                     # counts per pixel histogram
                     if do_counts_per_pix:
-                        if len(dd_check[hist_template]["data"].shape) != 3:
+                        if len(dd_check[hist_template]["data"].shape) != 4:
                             raise RuntimeError("Error! Data does NOT contain second channel"
                                                " with map before PSF application! Aborting...")
                         if is_add_two:
                             hist_input = np.stack([data_dict_0[hist_template]["data"],
-                                                   data_dict_1[hist_template]["data"]], 3).sum(3)
+                                                   data_dict_1[hist_template]["data"]], -1).sum(-1)
                         else:
                             hist_input = data_dict[hist_template]["data"]
-                        counts_per_pix_hist = np.asarray([np.histogram(hist_input[i, :, 1], weights=hist_input[i, :, 1],
+                        hist_input = hist_input.sum(-2)  # sum over energies
+                        counts_per_pix_hist = np.asarray([np.histogram(hist_input[i, :, 1],
+                                                                       weights=hist_input[i, :, 1],
                                                                        bins=bins_counts_per_pix)[0]
                                                           for i in range(n_maps_per_file)])
                         counts_per_pix_hist_sum = counts_per_pix_hist.sum(1)
@@ -438,21 +441,21 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                 print(dash)
                 print("Number of simulations: {0}".format(data_out["data"].shape[1]))
                 print("Templates:")
-                print(list(data_out["flux_fraction"].keys()))
+                print(list(flux_fraction_dict.keys()))
                 print("Max. flux fraction for each template:")
-                print([np.round(data_out["flux_fraction"][key].max(), 2)
-                       for key in data_out["flux_fraction"].keys()])
+                print([np.round(flux_fraction_dict[key].max(), 2)
+                       for key in flux_fraction_dict.keys()])
                 print("Min. flux fraction for each template:")
-                print([np.round(data_out["flux_fraction"][key].min(), 2)
-                       for key in data_out["flux_fraction"].keys()])
+                print([np.round(flux_fraction_dict[key].min(), 2)
+                       for key in flux_fraction_dict.keys()])
                 print("Mean flux fraction for each template:")
-                print([np.round(data_out["flux_fraction"][key].mean(), 2)
-                       for key in data_out["flux_fraction"].keys()])
+                print([np.round(flux_fraction_dict[key].mean(), 2)
+                       for key in flux_fraction_dict.keys()])
                 print("Median flux fraction for each template:")
-                print([np.round(np.median(data_out["flux_fraction"][key]), 2)
-                       for key in data_out["flux_fraction"].keys()])
+                print([np.round(np.median(flux_fraction_dict[key]), 2)
+                       for key in flux_fraction_dict.keys()])
                 print("Avg. total number of counts:")
-                print(np.round(np.mean(combined_map.sum(1))))
+                print(np.round(np.mean(combined_map.sum(-1).sum(-1))))
                 print(dash + "\n")
 
                 # Stats concerning histograms
