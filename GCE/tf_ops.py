@@ -32,19 +32,20 @@ def normalized_softplus(x, axis=1):
     return tf.nn.softplus(x) / tf.reduce_sum(tf.nn.softplus(x), axis=axis, keepdims=True)
 
 
-def split_mean_var(output, mean_act, k):
+def split_mean_var(output, mean_act, k, e_bins):
     """
     Format NN output into mean and variances (or in case of Laplace llh: loc. parameter, 2 * scale paramaeter)
     :param output: (batch, k * 2 tensor:
                     k elements: mean, then k elements: variances
     :param mean_act: activation function that will be applied to the mean
-    :param k: dimension of regression output
+    :param k: number of templates
     :return: mean, log variances
     """
     assert k > 0, "k must be positive!"
-    assert output.shape[1] == k * 2, "Aleatoric uncertainty estimation: wrong input shape!"
-    mean = mean_act(output[:, :k])
-    logvar = output[:, k:]
+    assert e_bins > 0, "e_bins must be positive!"
+    assert output.shape[1] == e_bins * k * 2, "Aleatoric uncertainty estimation: wrong input shape!"
+    mean = tf.reshape(mean_act(output[:, :k * e_bins]), (-1, k, e_bins))
+    logvar = tf.reshape(output[:, k * e_bins:], (-1, k, e_bins))
     return mean, logvar
 
 
