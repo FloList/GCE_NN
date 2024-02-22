@@ -44,8 +44,12 @@ def split_mean_var(output, mean_act, k, e_bins):
     assert k > 0, "k must be positive!"
     assert e_bins > 0, "e_bins must be positive!"
     assert output.shape[1] == e_bins * k * 2, "Aleatoric uncertainty estimation: wrong input shape!"
-    mean = tf.reshape(mean_act(output[:, :k * e_bins]), (-1, k, e_bins))
+    # assert output.shape[1] == k * 2, "Aleatoric uncertainty estimation: wrong input shape!"  # for now: no spectra!
+    # Activation function should go only over the template dimension
+    mean = mean_act(tf.reshape(output[:, :k * e_bins], (-1, k, e_bins)))
     logvar = tf.reshape(output[:, k * e_bins:], (-1, k, e_bins))
+    # mean = mean_act(output[:, :k])
+    # logvar = output[:, k:]
     return mean, logvar
 
 

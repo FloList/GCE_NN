@@ -96,7 +96,7 @@ class DeepsphereCNN:
                 if 'final_layer' in layer.name:
                     ff_hist_ind += 1
 
-            print(f"Trainable weights: {len(trainable_weights_dict['ff'])} for flux fractions, "
+            print(f"Trainable tensors: {len(trainable_weights_dict['ff'])} for flux fractions, "
                   f"{len(trainable_weights_dict['hist'])} for SCD histograms.")
             tot_weights_saved = len(trainable_weights_dict["ff"]) + len(trainable_weights_dict["hist"])
             assert tot_weights_saved == len(model.trainable_weights), \

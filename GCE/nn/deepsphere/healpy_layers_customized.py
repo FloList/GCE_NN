@@ -515,7 +515,6 @@ class FinalLayer(Layer):
         if self._which == "flux_fractions":
 
             # Aleatoric uncertainty covariance matrix
-
             if self._p.nn.ff["alea_covar"]:
                 output_dict["ff_mean"], output_dict["ff_covar"] = split_mean_cov(x, self.activation,
                                                                                  self._p.mod["n_models"], eps=1e-6)
@@ -528,7 +527,7 @@ class FinalLayer(Layer):
 
             # Only mean estimates
             else:
-                x = self.activation(x)
+                x = self.activation(tf.reshape(x, (-1, self._p.mod["n_models"], len(self._p.data["log_ebins"]) - 1)))
                 output_dict["ff_mean"] = x
 
         # Histogram submodel:
@@ -574,7 +573,7 @@ class PoissonResidualLayer(Layer):
 
         # From flux fractions, get count fractions
         ff_sum = tf.reduce_sum(ff_mean, 1, keepdims=True)
-        count_fracs_unnorm = ff_mean *self.counts2flux_roi_arr[None, :, None]
+        count_fracs_unnorm = ff_mean * self.counts2flux_roi_arr[None, :, None]
         count_fracs = count_fracs_unnorm / (tf.reduce_sum(count_fracs_unnorm, axis=1, keepdims=True) / ff_sum)
 
         # Get counts per template

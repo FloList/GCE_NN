@@ -714,27 +714,12 @@ class Analysis:
                 if which != "histograms":
                     tau = median_tau
                 elif self.p.train["hist_tau_prior"] == "uniform":
-                    if self.p.train["hist_same_tau_for_each_flux_query"]:
-                        tau_raw = tau_dist.sample((self.p.train["batch_size"], 1, self.p.train["hist_n_taus"]))  # n_batch x n_flux_queries
-                        tau = tf.reshape(tf.tile(tau_raw, (1, self.p.train["hist_n_flux_queries"], 1)), (-1, 1))
-                    else:
-                        tau = tau_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))  # n_batch * n_taus * n_flux_queries
+                    tau = tau_dist.sample((data_.shape[0], 1))
                 elif self.p.train["hist_tau_prior"] == "uniform_in_z":
-                    if self.p.train["hist_same_tau_for_each_flux_query"]:
-                        z_vals_raw = z_dist.sample((self.p.train["batch_size"], 1, self.p.train["hist_n_taus"]))
-                        z_vals = tf.reshape(tf.tile(z_vals_raw, (1, self.p.train["hist_n_flux_queries"], 1)), (-1, 1))
-                    else:
-                        z_vals = z_dist.sample((self.p.train["batch_size"] * self.p.train["hist_n_taus"] * self.p.train["hist_n_flux_queries"], 1))
+                    z_vals = z_dist.sample((data_.shape[0], 1))
                     tau = norm_dist.cdf(z_vals)
-
-                # if self.p.nn.hist["continuous"]:
-                #     normed_flux_queries_raw = normed_flux_query_dist.sample((data_.shape[0] * self.p.train["hist_n_flux_queries"], 1))   # TODO: CHECK IF IT'S BETTER TO TAKE THE SAME FLUX VALUES ALL MAPS
-                #     normed_flux_queries = tf.reshape(tf.tile(tf.reshape(normed_flux_queries_raw,
-                #                                                         (data_.shape[0],
-                #                                                          self.p.train["hist_n_flux_queries"], 1)),
-                #                                              (1, 1, self.p.train["hist_n_taus"])), (-1, 1))
-                #     nn_input = [data_, tau, normed_flux_queries]
-                # else:
+                else:
+                    raise NotImplementedError(f"hist_tau_prior {self.p.train['hist_tau_prior']} unknown!")
                 nn_input = [data_, tau]
             else:
                 nn_input = data_
@@ -744,8 +729,25 @@ class Analysis:
         def get_loss(data_, label_, global_size, training):
             nn_input = get_nn_input(data_)
             nn_output = self.nn(nn_input, training=training)
-            return tf.reduce_sum(loss(label_, *[nn_output[k] for k in loss_keys]), 0) \
-                   / global_size
+            multiplier = 1e10  # to avoid numerical issues
+            new_dict = {}
+
+            # Convert flux fractions to fluxes
+            if which == "flux_fractions":
+                total_fluxes_per_bin = tf.reduce_sum(label_, axis=1, keepdims=True)
+                # total_fluxes = tf.reduce_sum(total_fluxes_per_bin, axis=2, keepdims=True)
+                # ebin_weighting = total_fluxes_per_bin
+                new_dict["ff_mean"] = nn_output["ff_mean"] * total_fluxes_per_bin * multiplier
+                if self.p.nn.ff["alea_var"]:
+                    new_dict["ff_logvar"] = nn_output["ff_logvar"] + 2 * tf.math.log(total_fluxes_per_bin) + tf.math.log(multiplier)  # log(x^2) = 2 * log(x)
+
+                # label_ /= total_fluxes_per_bin
+                # Average the loss over the energy bins
+                return tf.reduce_mean(tf.reduce_sum(loss(label_ * multiplier, *[new_dict[k] for k in loss_keys]), 0)) \
+                          / global_size
+            else:
+                return tf.reduce_sum(loss(label_, *[nn_output[k] for k in loss_keys]), 0) \
+                       / global_size
 
         # Define training step
         def train_step(data_, label_, global_size):
@@ -759,9 +761,28 @@ class Analysis:
         def get_metrics(data_, label_, global_size, training=False):
             metric_values = []
             nn_input = get_nn_input(data_)
-            for metric, metric_keys_loc in zip(metric_list, metric_keys):
-                metric_values.append(tf.reduce_sum(metric_fct(metric)[0](label_, *[self.nn(
-                    nn_input, training=training)[k] for k in metric_keys_loc]), 0) / global_size)
+            nn_output = self.nn(nn_input, training=training)
+            multiplier = 1e10  # to avoid numerical issues
+            new_dict = {}
+
+            # Convert flux fractions to fluxes
+            if which == "flux_fractions":
+                total_fluxes_per_bin = tf.reduce_sum(data_, axis=1, keepdims=True)
+                # total_fluxes = tf.reduce_sum(total_fluxes_per_bin, axis=2, keepdims=True)
+                # ebin_weighting = total_fluxes_per_bin / total_fluxes
+                new_dict["ff_mean"] = nn_output["ff_mean"] * multiplier
+                if self.p.nn.ff["alea_var"]:
+                    new_dict["ff_logvar"] = nn_output["ff_logvar"] + 2 * tf.math.log(total_fluxes_per_bin) + tf.math.log(multiplier) # log(x^2) = 2 * log(x)
+                for metric, metric_keys_loc in zip(metric_list, metric_keys):
+                    metric_values.append(tf.reduce_mean(tf.reduce_sum(metric_fct(metric)[0](label_, *[new_dict[k]
+                                                                                                      for k in
+                                                                                                      metric_keys_loc]),
+                                                                      0)) / global_size)
+            else:
+                for metric, metric_keys_loc in zip(metric_list, metric_keys):
+                    metric_values.append(tf.reduce_sum(metric_fct(metric)[0](label_ * multiplier,
+                                                                             *[nn_output[k] for k in metric_keys_loc]),
+                                                       0) / global_size)
             return metric_values
 
         # Wrapper around get_loss that takes care of the replicas in case multiple GPUs are available
@@ -828,6 +849,9 @@ class Analysis:
                             lr_summary = optimizer.learning_rate(global_step)
                         tf.summary.scalar('learning_rate', lr_summary, step=global_step)  # deleted (global_step)
                         tf.summary.scalar('losses/' + which + '/train_loss', loss_eval.numpy(), step=global_step)
+
+                        if np.isnan(loss_eval.numpy()):
+                            raise RuntimeError("NaN loss encountered during training!")
 
                         # Metrics on training data. NOTE: evaluating in "training = True" mode here
                         metric_train_eval = distributed_get_metrics(data, labels, global_size_train, training=True)

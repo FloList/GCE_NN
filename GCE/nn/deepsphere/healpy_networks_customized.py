@@ -28,6 +28,7 @@ class HealpyGCNN:
 
         if which == "flux_fractions":
             dim_out = self._p.mod["n_models"] * (len(self._p.data["log_ebins"]) - 1)
+            # dim_out = self._p.mod["n_models"] # no spectrum
             if self._p.nn.ff["alea_covar"]:
                 # dim_out += dim_out * (dim_out + 1) // 2  # aleatoric uncertainty covariance matrix
                 raise NotImplementedError("Covariance matrix not implemented for >1 energy bins!")
@@ -65,6 +66,7 @@ class HealpyGCNN:
 
         # Get total counts (per energy bin)
         tot_counts = tf.reduce_sum(first_channel, axis=1, keepdims=True)
+        tot_counts_over_all_bins = tf.reduce_sum(tot_counts, axis=2, keepdims=True)
 
         # Get standard deviation
         std = tf.math.reduce_std(first_channel, axis=1, keepdims=True)
@@ -72,7 +74,7 @@ class HealpyGCNN:
         # Relative counts (i.e., divide by total number of counts in the map)?
         rel_counts = self._p.nn.hist["rel_counts"] if self.which == "histograms" else self._p.nn.ff["rel_counts"]
         if rel_counts:
-            first_channel = first_channel / tot_counts
+            first_channel = first_channel / tot_counts_over_all_bins
 
         preprocessed_input = first_channel  # store in a variable that will be returned (input for residual calculation)
 
