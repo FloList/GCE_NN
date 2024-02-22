@@ -78,23 +78,17 @@ class DeepsphereCNN:
             model.summary()
 
             # Now: store trainable parameters for each submodel to enable flexible training
-            # TODO: THIS SEEMS TO BE BROKEN NOW, FIX (SEE FLO WOLF'S CODE!)
             trainable_weights_dict = {"ff": [], "hist": []}
-            ff_hist_ind = 0 if self._p.nn.ff["return_ff"] else 1
 
             # Iterate over the layers and store trainable weights
             for layer in model.layers:
-                if len(layer.trainable_weights) > 0:
-                    if ff_hist_ind == 0:
+                if hasattr(layer, "_which"):
+                    if layer._which == "flux_fractions":
                         trainable_weights_dict["ff"].extend(layer.trainable_weights)
-                    elif ff_hist_ind == 1:
+                    elif layer._which == "histograms":
                         trainable_weights_dict["hist"].extend(layer.trainable_weights)
                     else:
                         raise ValueError
-
-                # Done with FF submodel?
-                if 'final_layer' in layer.name:
-                    ff_hist_ind += 1
 
             print(f"Trainable tensors: {len(trainable_weights_dict['ff'])} for flux fractions, "
                   f"{len(trainable_weights_dict['hist'])} for SCD histograms.")

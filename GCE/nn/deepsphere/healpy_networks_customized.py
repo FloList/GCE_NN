@@ -128,7 +128,9 @@ class HealpyGCNN:
             sphere = SphereHealpix(**kwargs_d, subdivisions=current_nside, indexes=current_indices, nest=True,
                                    k=n_neighbors, lap_type='normalized')
             current_laplacian = sphere.L
-            t = layer_spec.get_layer(current_laplacian)(t)
+            actual_conv_layer = layer_spec.get_layer(current_laplacian)
+            actual_conv_layer._which = self.which
+            t = actual_conv_layer(t)
 
             # Pooling layer
             if pa["pool"] in ["max", "avg"]:
@@ -145,9 +147,9 @@ class HealpyGCNN:
 
         # Append total counts and std?
         if pa["append_tot_counts"] and rel_counts:
-            t = tf.concat([t, tf.math.log(tf.squeeze(tot_counts, 1)) / 2.302], axis=1)  # 2.3026 ~ log_e(10)
+            t = tf.concat([t, tf.math.log(1.0 + tf.squeeze(tot_counts, 1)) / 2.302], axis=1)  # 2.3026 ~ log_e(10)
         if pa["append_std"]:
-            t = tf.concat([t, tf.math.log(tf.squeeze(std, 1)) / 2.302], axis=1)
+            t = tf.concat([t, tf.math.log(1.0 + tf.squeeze(std, 1)) / 2.302], axis=1)
 
         # If Earth Mover's pinball loss: append taus at this point
         # We use the scaling proposed by
@@ -168,12 +170,16 @@ class HealpyGCNN:
         # Fully-connected blocks
         # Note: batch norm is provided in a single array for conv. layers and FC layers!
         for il in range(len(pa["M"])):
-            t = hp_nn.FullyConnectedBlock(Fout=pa["M"][il], use_bias=True,
+            linear_layer = hp_nn.FullyConnectedBlock(Fout=pa["M"][il], use_bias=True,
                                           use_bn=pa['batch_norm'][len(pa["F"]) + il],
-                                          activation=pa["activation"])(t)
+                                          activation=pa["activation"])
+            linear_layer._which = self.which
+            t = linear_layer(t)
 
         # Final fully-connected layer without activation
-        t = tf.keras.layers.Dense(self.dim_out_flat, use_bias=False)(t)
+        linear_layer_final = tf.keras.layers.Dense(self.dim_out_flat, use_bias=False)
+        linear_layer_final._which = self.which
+        t = linear_layer_final(t)
 
         # For histograms: reshape to n_batch x n_bins x n_hist_templates
         if self.which == "histograms":
@@ -181,7 +187,9 @@ class HealpyGCNN:
 
         # Final layer: will be taken care of when building the model
         kwargs_final = {}
-        out_dict = hp_nn.FinalLayer(which=self.which, params=self._p)(t, **kwargs_final)
+        final_layer = hp_nn.FinalLayer(which=self.which, params=self._p)
+        final_layer._which = self.which
+        out_dict = final_layer(t, **kwargs_final)
 
         print("The resolution will be successively reduced from nside={:} to nside={:} during a forward pass.".format(
             self._p.data["nside"], self._p.nn.arch["nsides"][-1]), flush=True)
