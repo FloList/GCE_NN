@@ -211,7 +211,7 @@ def get_params(int_flag=0):
     p_arch = DotDict()
     p_arch['nsides'] = [256, 128, 64, 32, 16, 8, 4, 2, 1]  # list containing nside hierarchy for a forward pass though the NN
     # p_arch['F'] = [32, 64, 128, 256, 256, 256, 256]  # graph-convolutional layers: number of feature maps for each layer
-    p_arch['F'] = [4, 8, 16, 32, 32, 32, 32, 32]  # graph-convolutional layers: number of feature maps for each layer FOR DEBUGGING!
+    p_arch['F'] = [8, 16, 32, 64, 64, 64, 64, 64]  # graph-convolutional layers: number of feature maps for each layer FOR DEBUGGING!
     p_arch['M'] = [2048, 512]  # hidden fully-connected layers: output dimensionalities
     # Note: This should NOT include final fully-connected layer whose output dimension will automatically be computed
     p_arch['K'] = [5] * len(p_arch['F'])  # polynomial orders for the graph convolutions
@@ -230,7 +230,7 @@ def get_params(int_flag=0):
     p_ff = DotDict()
     p_ff["return_ff"] = True  # main switch for flux fraction estimation
     p_ff["alea_covar"] = False  # if True: estimate aleatoric uncertainty covariance matrix
-    p_ff["alea_var"] = True  # if True: estimate aleatoric uncertainty variances, no correlations
+    p_ff["alea_var"] = False  # if True: estimate aleatoric uncertainty variances, no correlations
     p_ff["rel_counts"] = True  # scale the pixel values by the total number of counts in the map?
     p_ff["last_act"] = "softmax"  # last activation function yielding the flux fraction mean estimates
     # "softmax" or "normalized_softplus"
@@ -244,7 +244,7 @@ def get_params(int_flag=0):
     # Note: this must be subset of the templates for which the histograms were saved, given by p_comb["hist_templates")
     p_hist["last_act"] = "normalized_softplus"  # last activation function yielding the SCD histogram,
     # "softmax" or "normalized_softplus"
-    p_hist["calculate_residual"] = True  # calculate FF residual and feed as an additional input to the brightness part
+    p_hist["calculate_residual"] = False  # calculate FF residual and feed as an additional input to the brightness part  # TODO!
     p_hist["rel_counts"] = True  # feed relative counts (and normalized residual) to histogram part of the NN?
     p_hist["which_histogram"] = "dNdF"  # "dNdF", "counts_per_PS", or "counts_per_pix"
     p_hist["log_spaced_bins"] = True  # are the bins logarithmically spaced (otherwise: linear spacing is assumed)?
@@ -268,12 +268,12 @@ def get_params(int_flag=0):
     p_train = DotDict()
     # Note: the batch sizes specified below set the GLOBAL batch size.
     # For example, setting p_train['batch_size'] = 256 yields n_batch = 64 on each GPU when using 4 GPUs.
-    p_train['num_steps'] = 2500  # number of steps to do (total number of maps shown is num_steps * batch_size)
+    p_train['num_steps'] = 500  # number of steps to do (total number of maps shown is num_steps * batch_size)
     p_train['batch_size'] = 16  # number of samples per training batch. Should be a power of 2 for greater speed
     p_train['batch_size_val'] = 16  # number of samples per validation batch
     p_train['prefetch_batch_buffer'] = 5  # number of batches to prefetch for training data
     p_train['prefetch_batch_buffer_val'] = 5  # number of batches to prefetch for validation data
-    p_train['eval_frequency'] = 50  # frequency of model evaluations during training (influences training time!)
+    p_train['eval_frequency'] = 10  # frequency of model evaluations during training (influences training time!)
     p_train['scheduler'] = 'ExponentialDecay'  # learning rate scheduler
     p_train['scheduler_dict'] = {"initial_learning_rate": 5e-4, "decay_steps": 1, "decay_rate": 1 - 0.00015,
                                  "staircase": False}  # scheduler settings
@@ -284,6 +284,7 @@ def get_params(int_flag=0):
     p_train['hist_loss'] = 'EMPL'  # loss function for the SCD histogram estimation
     # one of: "l1", "l2", "EM1", "EM2", "CJS" (cumulative Jensen-Shannon), "x-ent", "EMPL" (Earth Mover's Pinball Loss)
     p_train['hist_pinball_smoothing'] = 0.001  # if > 0.0: take smoothed pinball loss (for example: 0.001)
+    p_train["hist_tau_prior"] = "uniform"  # prior for the quantile levels tau (for EMPL loss)
     p_train['ff_train_metrics'] = ["l2", "l1", "x-ent"]  # flux fraction metrics for tensorboard
     p_train['hist_train_metrics'] = ["l2", "l1", "x-ent"]  # SCD histogram metrics for tensorboard
     p["train"] = p_train

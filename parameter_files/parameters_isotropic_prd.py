@@ -134,7 +134,7 @@ def get_params(int_flag=0):
     p_tt["data_name"] = "Iso_example_prd"  # name of data folder for the template maps
     p_tt["filename_base"] = "Maps"  # name basis of template map files
     p_tt["poisson_A_is_log"] = False  # is log10(A) rather than A specified for the Poissonian templates in prior_dict?
-    p_tt["n_chunk"] = int(600)  # number of chunks to compute per job
+    p_tt["n_chunk"] = int(2000)  # number of chunks to compute per job
     p_tt["n_sim_per_chunk"] = int(100)  # number of simulations per chunk and per model (one output file per chunk)
     # Note: the total number of maps for each template will be "n_chunk" * "n_sim_per_chunk" (* # jobs)
     p_tt["add_two_temps_PS"] = []  # list of PS templates for which TWICE the number of maps will be generated.

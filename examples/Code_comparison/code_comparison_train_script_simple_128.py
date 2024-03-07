@@ -9,7 +9,7 @@ import GCE.gce
 
 gce = GCE.gce.Analysis()
 
-gce.load_params("../../parameter_files/Code_comparison/parameters_code_comparison.py")
+gce.load_params("../../parameter_files/Code_comparison/parameters_code_comparison_simple_128.py")
 
 gce.print_params()
 
@@ -38,18 +38,18 @@ print("  Flux", labels[0].shape)  # n_samples x n_templates x n_bins
 print("  SCD histograms", labels[1].shape)  # n_samples x n_bins x n_PS_templates
 
 # NOTE: the maps are stored in NEST format
-map_to_plot = 0
-lon_min = gce.p.data["lon_min"]
-lon_max = gce.p.data["lon_max"]
-lat_min = gce.p.data["lat_min"]
-lat_max = gce.p.data["lat_max"]
-hp.cartview(gce.decompress((data[map_to_plot] * gce.template_dict["rescale_compressed"]).sum(-1)), nest=True,
-            title="Simulated data: Count space", lonra=[lon_min, lon_max], latra=[lat_min, lat_max])
-hp.cartview(gce.decompress(data[map_to_plot].sum(-1)), nest=True,
-            title="Simulated data: Flux space", lonra=[lon_min, lon_max], latra=[lat_min, lat_max])
-# hp.cartview(gce.decompress(gce.template_dict["rescale_compressed"].mean(-1), fill_value=np.nan), nest=True,
-#             title="Fermi exposure correction", lonra=[lon_min, lon_max], latra=[lat_min, lat_max])
-plt.show()
+# map_to_plot = 0
+# lon_min = gce.p.data["lon_min"]
+# lon_max = gce.p.data["lon_max"]
+# lat_min = gce.p.data["lat_min"]
+# lat_max = gce.p.data["lat_max"]
+# hp.cartview(gce.decompress((data[map_to_plot] * gce.template_dict["rescale_compressed"]).sum(-1)), nest=True,
+#             title="Simulated data: Count space", lonra=[lon_min, lon_max], latra=[lat_min, lat_max])
+# hp.cartview(gce.decompress(data[map_to_plot].sum(-1)), nest=True,
+#             title="Simulated data: Flux space", lonra=[lon_min, lon_max], latra=[lat_min, lat_max])
+# # hp.cartview(gce.decompress(gce.template_dict["rescale_compressed"].mean(-1), fill_value=np.nan), nest=True,
+# #             title="Fermi exposure correction", lonra=[lon_min, lon_max], latra=[lat_min, lat_max])
+# plt.show()
 
 gce.build_nn()
 
@@ -68,8 +68,11 @@ test_samples = gce.datasets["test"].get_samples(n_samples)
 test_data, test_ffs, test_hists = test_samples["data"], test_samples["label"][0], test_samples["label"][1]
 tau = np.arange(5, 100, 5) * 0.01  # quantile levels for SCD histograms, from 5% to 95% in steps of 5%
 pred = gce.predict(test_data, tau=tau, multiple_taus=True)  # get the NN predictions
-pred["ff_mean_full"], pred["ff_logvar_full"] = pred["ff_mean"], pred["ff_logvar"]  # store the full predictions
-pred["ff_mean"], pred["ff_logvar"] = tf.reduce_mean(pred["ff_mean_full"], axis=-1), tf.reduce_mean(pred["ff_logvar_full"], axis=-1)  # average over energy bins
+pred["ff_mean_full"] = pred["ff_mean"]    # store the full predictions
+# pred["ff_logvar_full"] = pred["ff_logvar"]
+pred["ff_mean"] = tf.reduce_mean(pred["ff_mean_full"], axis=-1)  # average over energy bins
+# pred["ff_logvar"] = tf.reduce_mean(pred["ff_logvar_full"], axis=-1)
+
 
 # Make some plots (will be saved in the models folder)
 # gce.plot_nn_architecture()

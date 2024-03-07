@@ -113,10 +113,10 @@ hp.mollview(np.log10(iso_model_256[-1]), title="Isotropic PS exp-corr @ 5 GeV 25
 # Do NOT convolve with the PSF, as this is a PS template!
 
 # Save everything
-np.save(os.path.join(out_folder, "fermi_data_128", "template_diffuse_silvia_smooth.npy"), smoothed_dif_maps_corr_128)
-np.save(os.path.join(out_folder, "fermi_data_256", "template_diffuse_silvia_smooth.npy"), smoothed_dif_maps_corr_256)
-np.save(os.path.join(out_folder, "fermi_data_128", "template_iso.npy"), iso_model_128)
-np.save(os.path.join(out_folder, "fermi_data_256", "template_iso.npy"), iso_model_256)
+# np.save(os.path.join(out_folder, "fermi_data_128", "template_diffuse_silvia_smooth.npy"), smoothed_dif_maps_corr_128)
+# np.save(os.path.join(out_folder, "fermi_data_256", "template_diffuse_silvia_smooth.npy"), smoothed_dif_maps_corr_256)
+# np.save(os.path.join(out_folder, "fermi_data_128", "template_iso.npy"), iso_model_128)
+# np.save(os.path.join(out_folder, "fermi_data_256", "template_iso.npy"), iso_model_256)
 
 
 # # PSF testing

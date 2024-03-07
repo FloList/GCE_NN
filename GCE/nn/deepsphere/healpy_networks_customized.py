@@ -27,7 +27,10 @@ class HealpyGCNN:
         self._ind_holes_to_ex = index_dict["ind_holes_to_ex"]
 
         if which == "flux_fractions":
-            dim_out = self._p.mod["n_models"] * (len(self._p.data["log_ebins"]) - 1)
+            if self._p.nn.ff["return_energies"]:
+                dim_out = self._p.mod["n_models"] * (len(self._p.data["log_ebins"]) - 1)
+            else:
+                dim_out = self._p.mod["n_models"]
             # dim_out = self._p.mod["n_models"] # no spectrum
             if self._p.nn.ff["alea_covar"]:
                 # dim_out += dim_out * (dim_out + 1) // 2  # aleatoric uncertainty covariance matrix

@@ -79,6 +79,7 @@ class DeepsphereCNN:
 
             # Now: store trainable parameters for each submodel to enable flexible training
             trainable_weights_dict = {"ff": [], "hist": []}
+            non_trainable_weights_list = []
 
             # Iterate over the layers and store trainable weights
             for layer in model.layers:
@@ -86,12 +87,16 @@ class DeepsphereCNN:
                     if layer._which == "flux_fractions":
                         trainable_weights_dict["ff"].extend(layer.trainable_weights)
                     elif layer._which == "histograms":
-                        trainable_weights_dict["hist"].extend(layer.trainable_weights)
+                        trainable_weights_dict["hist"].extend(layer.weights)
                     else:
                         raise ValueError
+                else:
+                    non_trainable_weights_list.extend(layer.trainable_weights)
 
             print(f"Trainable tensors: {len(trainable_weights_dict['ff'])} for flux fractions, "
                   f"{len(trainable_weights_dict['hist'])} for SCD histograms.")
+            print(f"Non-trainable weights: {len(non_trainable_weights_list)}")
+
             tot_weights_saved = len(trainable_weights_dict["ff"]) + len(trainable_weights_dict["hist"])
             assert tot_weights_saved == len(model.trainable_weights), \
                 "Expected to save {:} weights, but trainable_weights_dict contains {:} weights. Aborting...".format(

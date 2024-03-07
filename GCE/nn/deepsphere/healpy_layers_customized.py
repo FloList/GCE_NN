@@ -444,7 +444,7 @@ class FullyConnectedBlock(Layer):
         Build the weights of the layer
         :param input_shape: shape of the input, batch dim has to be defined
         """
-        kernel_initializer = "he_uniform" if self.initializer is None else self.initializer
+        kernel_initializer = "glorot_uniform" if self.initializer is None else self.initializer
         self.fc = tf.keras.layers.Dense(self.Fout, use_bias=self.use_bias, kernel_initializer=kernel_initializer)
 
     def call(self, input_tensor, *args, **kwargs):
@@ -511,6 +511,11 @@ class FinalLayer(Layer):
         x = input_tensor
         output_dict = {}
 
+        if self._p.nn.ff["return_energies"]:
+            n_ebins = len(self._p.data["log_ebins"]) - 1
+        else:
+            n_ebins = 1
+
         # Flux fraction submodel:
         if self._which == "flux_fractions":
 
@@ -523,11 +528,11 @@ class FinalLayer(Layer):
             elif self._p.nn.ff["alea_var"]:
                 output_dict["ff_mean"], output_dict["ff_logvar"] = split_mean_var(x, self.activation,
                                                                                   self._p.mod["n_models"],
-                                                                                  len(self._p.data["log_ebins"]) - 1)
+                                                                                  n_ebins)
 
             # Only mean estimates
             else:
-                x = self.activation(tf.reshape(x, (-1, self._p.mod["n_models"], len(self._p.data["log_ebins"]) - 1)))
+                x = self.activation(tf.reshape(x, (-1, self._p.mod["n_models"], n_ebins)))
                 output_dict["ff_mean"] = x
 
         # Histogram submodel:

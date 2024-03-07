@@ -729,25 +729,40 @@ class Analysis:
         def get_loss(data_, label_, global_size, training):
             nn_input = get_nn_input(data_)
             nn_output = self.nn(nn_input, training=training)
-            multiplier = 1e10  # to avoid numerical issues
-            new_dict = {}
 
-            # Convert flux fractions to fluxes
             if which == "flux_fractions":
-                total_fluxes_per_bin = tf.reduce_sum(label_, axis=1, keepdims=True)
-                # total_fluxes = tf.reduce_sum(total_fluxes_per_bin, axis=2, keepdims=True)
-                # ebin_weighting = total_fluxes_per_bin
-                new_dict["ff_mean"] = nn_output["ff_mean"] * total_fluxes_per_bin * multiplier
-                if self.p.nn.ff["alea_var"]:
-                    new_dict["ff_logvar"] = nn_output["ff_logvar"] + 2 * tf.math.log(total_fluxes_per_bin) + tf.math.log(multiplier)  # log(x^2) = 2 * log(x)
+                if self.p.nn.ff["return_energies"]:
+                    raise NotImplementedError
+                else:
+                    true_fluxes = tf.reduce_sum(label_, -1, keepdims=True)
+                    true_flux_fractions = true_fluxes / tf.reduce_sum(true_fluxes, -2, keepdims=True)
+                    return tf.reduce_sum(loss(true_flux_fractions, *[nn_output[k] for k in loss_keys])) / global_size
 
-                # label_ /= total_fluxes_per_bin
-                # Average the loss over the energy bins
-                return tf.reduce_mean(tf.reduce_sum(loss(label_ * multiplier, *[new_dict[k] for k in loss_keys]), 0)) \
-                          / global_size
             else:
                 return tf.reduce_sum(loss(label_, *[nn_output[k] for k in loss_keys]), 0) \
                        / global_size
+
+
+            # multiplier = 1e0  # to avoid numerical issues
+            # new_dict = {}
+            #
+            # # Convert flux fractions to fluxes
+            # if which == "flux_fractions":
+            #     total_fluxes_per_bin = tf.reduce_sum(label_, axis=1, keepdims=True)
+            #     # total_fluxes = tf.reduce_sum(total_fluxes_per_bin, axis=2, keepdims=True)
+            #     # ebin_weighting = total_fluxes_per_bin
+            #     # new_dict["ff_mean"] = nn_output["ff_mean"] * total_fluxes_per_bin * multiplier
+            #     new_dict["ff_mean"] = nn_output["ff_mean"] * multiplier
+            #     if self.p.nn.ff["alea_var"]:
+            #         new_dict["ff_logvar"] = nn_output["ff_logvar"] + 2 * tf.math.log(total_fluxes_per_bin) + tf.math.log(multiplier)  # log(x^2) = 2 * log(x)
+            #
+            #     label_ /= total_fluxes_per_bin
+            #     # Average the loss over the energy bins
+            #     return tf.reduce_mean(tf.reduce_sum(loss(label_ * multiplier, *[new_dict[k] for k in loss_keys]), 0)) \
+            #               / global_size
+            # else:
+            #     return tf.reduce_sum(loss(label_, *[nn_output[k] for k in loss_keys]), 0) \
+            #            / global_size
 
         # Define training step
         def train_step(data_, label_, global_size):
@@ -762,27 +777,45 @@ class Analysis:
             metric_values = []
             nn_input = get_nn_input(data_)
             nn_output = self.nn(nn_input, training=training)
-            multiplier = 1e10  # to avoid numerical issues
-            new_dict = {}
 
-            # Convert flux fractions to fluxes
             if which == "flux_fractions":
-                total_fluxes_per_bin = tf.reduce_sum(data_, axis=1, keepdims=True)
-                # total_fluxes = tf.reduce_sum(total_fluxes_per_bin, axis=2, keepdims=True)
-                # ebin_weighting = total_fluxes_per_bin / total_fluxes
-                new_dict["ff_mean"] = nn_output["ff_mean"] * multiplier
-                if self.p.nn.ff["alea_var"]:
-                    new_dict["ff_logvar"] = nn_output["ff_logvar"] + 2 * tf.math.log(total_fluxes_per_bin) + tf.math.log(multiplier) # log(x^2) = 2 * log(x)
-                for metric, metric_keys_loc in zip(metric_list, metric_keys):
-                    metric_values.append(tf.reduce_mean(tf.reduce_sum(metric_fct(metric)[0](label_, *[new_dict[k]
+                if self.p.nn.ff["return_energies"]:
+                    raise NotImplementedError
+                else:
+                    true_fluxes = tf.reduce_sum(label_, -1, keepdims=True)
+                    true_flux_fractions = true_fluxes / tf.reduce_sum(true_fluxes, -2, keepdims=True)
+                    for metric, metric_keys_loc in zip(metric_list, metric_keys):
+                        metric_values.append(tf.reduce_sum(metric_fct(metric)[0](true_flux_fractions, *[nn_output[k]
                                                                                                       for k in
                                                                                                       metric_keys_loc]),
-                                                                      0)) / global_size)
+                                                           ) / global_size)
             else:
                 for metric, metric_keys_loc in zip(metric_list, metric_keys):
-                    metric_values.append(tf.reduce_sum(metric_fct(metric)[0](label_ * multiplier,
-                                                                             *[nn_output[k] for k in metric_keys_loc]),
+                    metric_values.append(tf.reduce_sum(metric_fct(metric)[0](label_, *[nn_output[k] for k in metric_keys_loc]),
                                                        0) / global_size)
+
+
+            # multiplier = 1e8  # to avoid numerical issues
+            # new_dict = {}
+            #
+            # # Convert flux fractions to fluxes
+            # if which == "flux_fractions":
+            #     total_fluxes_per_bin = tf.reduce_sum(data_, axis=1, keepdims=True)
+            #     # total_fluxes = tf.reduce_sum(total_fluxes_per_bin, axis=2, keepdims=True)
+            #     # ebin_weighting = total_fluxes_per_bin / total_fluxes
+            #     new_dict["ff_mean"] = nn_output["ff_mean"] * multiplier
+            #     if self.p.nn.ff["alea_var"]:
+            #         new_dict["ff_logvar"] = nn_output["ff_logvar"] + 2 * tf.math.log(total_fluxes_per_bin) + tf.math.log(multiplier) # log(x^2) = 2 * log(x)
+            #     for metric, metric_keys_loc in zip(metric_list, metric_keys):
+            #         metric_values.append(tf.reduce_mean(tf.reduce_sum(metric_fct(metric)[0](label_, *[new_dict[k]
+            #                                                                                           for k in
+            #                                                                                           metric_keys_loc]),
+            #                                                           0)) / global_size)
+            # else:
+            #     for metric, metric_keys_loc in zip(metric_list, metric_keys):
+            #         metric_values.append(tf.reduce_sum(metric_fct(metric)[0](label_ * multiplier,
+            #                                                                  *[nn_output[k] for k in metric_keys_loc]),
+            #                                            0) / global_size)
             return metric_values
 
         # Wrapper around get_loss that takes care of the replicas in case multiple GPUs are available

@@ -2,8 +2,7 @@ import os
 import numpy as np
 import healpy as hp
 import matplotlib.pyplot as plt
-from astropy.io import fits
-# from GCE.data_utils import make_ring_mask
+from astropy.io import fits                                             
 
 # Load FITS files
 folder = "/home/flo/Documents/Projects/GCE_hist/Comparison_project/Data"
