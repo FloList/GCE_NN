@@ -754,7 +754,7 @@ class Analysis:
 
                     # Evaluate
                     with summary_writer.as_default():
-                        tf.summary.scalar('learning_rate', optimizer.learning_rate(global_step), step=global_step)
+                        tf.summary.scalar('learning_rate', optimizer.learning_rate, step=global_step)
                         tf.summary.scalar('losses/' + which + '/train_loss', loss_eval.numpy(), step=global_step)
 
                         # Metrics on training data. NOTE: evaluating in "training = True" mode here
@@ -948,8 +948,8 @@ class Analysis:
 
         # Save a flowchart to the figures folder
         # The following requires pydot and graphviz to be installed
-        tf.keras.utils.plot_model(self.nn, show_shapes=True, to_file=os.path.join(self.p.nn["figures_folder"],
-                                                                                  filename))
+        # tf.keras.utils.plot_model(self.nn, show_shapes=True, to_file=os.path.join(self.p.nn["figures_folder"],
+        #                                                                           filename))
 
     def plot_flux_fractions(self, true_ffs, preds, **kwargs):
         """
