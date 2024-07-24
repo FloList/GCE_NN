@@ -9,7 +9,7 @@ import GCE.gce
 
 gce = GCE.gce.Analysis()
 
-gce.load_params("../../parameter_files/Code_comparison/parameters_code_comparison_simple_128.py")
+gce.load_params("../../parameter_files/Code_comparison/parameters_code_comparison_simple_128_copy.py")
 
 gce.print_params()
 
@@ -54,10 +54,10 @@ print("  SCD histograms", labels[1].shape)  # n_samples x n_bins x n_PS_template
 gce.build_nn()
 
 
-gce.load_nn()
+# gce.load_nn()
 # gce.delete_run(confirm=False)
-# gce.train_nn("flux_fractions")
-# gce.train_nn("histograms")
+gce.train_nn("flux_fractions")
+gce.train_nn("histograms")
 
 n_samples = 50
 

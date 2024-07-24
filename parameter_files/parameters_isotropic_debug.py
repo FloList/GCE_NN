@@ -14,7 +14,7 @@ Brief overview:
         * These settings determine the region of interest (ROI), the point-source mask, exposure, and point-spread
           function (PSF) used for the data generation.
         * To modify the ROI, change the outer radius |r| < "outer_rad" (in degrees), the band mask around the Galactic
-          plane |b| > "inner_band" (in degrees), ...
+          plane |b| > "inner_band" (in degrees).
         * Choose a point-source mask ("3FGL" catalogue, "4FGL" catalogue, or "None" to generate data without a point-
           source mask).
         * The Fermi data provided in the repository is available at resolutions nside = 128 and 256, set "nside"
@@ -95,53 +95,47 @@ def get_params(int_flag=0):
     # General settings
     ###################################
     p_gen = DotDict()
-    p_gen["data_root"] = "../../data"  # data folder
-    p_gen["fermi_root"] = os.path.join("../../../Comparison_project/Data", "Numpy")  # root folder containing Fermi data
+    p_gen["data_root"] = "../data"  # data folder
+    p_gen["fermi_root"] = os.path.join(p_gen["data_root"], "fermi_data_573w")  # root folder containing Fermi data
     p_gen["template_maps_root"] = os.path.join(p_gen["data_root"], "Template_maps")  # folder for template maps
     p_gen["combined_maps_root"] = os.path.join(p_gen["data_root"], "Combined_maps")  # folder for combined maps
-    p_gen["models_root"] = "../../models"  # folder for models
+    p_gen["models_root"] = "../models"  # folder for models
     # Note: the Fermi root folder should have a subfolder "fermi_data_<NSIDE>", where <NSIDE> = p["nside"] (see below)
     p["gen"] = p_gen
 
     # Data settings
     ###################################
     p_data = DotDict()
-    p_data["outer_rad"] = 90.0  # outer ROI radius (in degrees, Galactic Center is at 0)
-    p_data["inner_band"] = 2.0  # latitudes |b| < this value will be masked
-    p_data["lon_min"] = -20.0  # minimum longitude (in degrees)
-    p_data["lon_max"] = 20.0  # maximum longitude (in degrees)
-    p_data["lat_min"] = -20.0  # minimum latitude (in degrees)
-    p_data["lat_max"] = 20.0  # maximum latitude (in degrees)
-    p_data["leakage_delta"] = 5.0  # for point-source map creation: PSs are sampled from a slightly larger ROI
+    p_data["outer_rad"] = 25.0  # outer ROI radius (in degrees, Galactic Center is at 0)
+    p_data["inner_band"] = 0.0  # latitudes |b| < this value will be masked
+    p_data["leakage_delta"] = 0.75  # for point-source map creation: PSs are sampled from a slightly larger ROI
     # (the margin is set in degrees here), allowing counts to leak into and out of the ROI.
     # Note: this is ignored if p_data["psf"] = False.
-    p_data["mask_type"] = "None"  # mask for known bright PSs: one of "None", "3FGL", "4FGL"
+    p_data["mask_type"] = None  # mask for known bright PSs: one of None, "3FGL", "4FGL"
     p_data["nside"] = int(128)  # nside resolution parameter of the data
-    p_data["exposure"] = "../../../Comparison_project/Data/Numpy/fermi_data_128/exp_10_bins.npy"  # one of "Fermi", "Fermi_mean", constant float, or filename of a custom exposure map
+    p_data["exposure"] = 1.0  # one of "Fermi", "Fermi_mean", or constant float
     p_data["psf"] = True  # if True: apply Fermi PSF to PS templates when generating PS maps
-    p_data["psf_file"] = "../../../Comparison_project/Data/Numpy/psf_10_bins_300_angles.npz"
-    p_data["log_ebins"] = np.log10(np.linspace(2.0, 5.0, 11))  # log energy bins / GeV
-
+    # (see the function fermi_psf() in data_utils.py)
     p["data"] = p_data
 
     # Modeling settings
     ###################################
     p_mod = DotDict()
-    p_mod["models_P"] = ["dif_silvia"]  # list of Poissonian templates
+    p_mod["models_P"] = []  # list of Poissonian templates
     p_mod["models_PS"] = ["iso_PS"]  # list of PS templates
     # Note: point-source models use the same names as the Poissonian models, but with a trailing "_PS"!
-    p_mod["model_names_P"] = [r"Background"]  # names: P
-    p_mod["model_names_PS"] = ["Isotropic PS"]  # names: PS
+    p_mod["model_names_P"] = []  # names: P
+    p_mod["model_names_PS"] = ["isotropic PS"]  # names: PS
     p["mod"] = p_mod
 
     # Template map settings (for training and testing maps)
     ###################################
     p_tt = DotDict()
-    p_tt["data_name"] = "Comparison_1"  # name of data folder for the template maps
+    p_tt["data_name"] = "Iso_example_debug"  # name of data folder for the template maps
     p_tt["filename_base"] = "Maps"  # name basis of template map files
     p_tt["poisson_A_is_log"] = False  # is log10(A) rather than A specified for the Poissonian templates in prior_dict?
-    p_tt["n_chunk"] = int(100) #int(5050)  # number of chunks to compute per job
-    p_tt["n_sim_per_chunk"] = int(20)  #int(50)  # number of simulations per chunk and per model (one output file per chunk)
+    p_tt["n_chunk"] = int(100)  # number of chunks to compute per job
+    p_tt["n_sim_per_chunk"] = int(50)  # number of simulations per chunk and per model (one output file per chunk)
     # Note: the total number of maps for each template will be "n_chunk" * "n_sim_per_chunk" (* # jobs)
     p_tt["add_two_temps_PS"] = ["iso_PS"]  # list of PS templates for which TWICE the number of maps will be generated.
     # Later, these maps can be added pairwise, modeling two distinct populations.
@@ -151,39 +145,28 @@ def get_params(int_flag=0):
     prior_dict = DotDict()
 
     # Poissonian templates: normalization A
-    prior_dict["dif_silvia"] = np.asarray([3e6, 6e6])
+    # The Poissonian prior values above correspond to nside = 128, scale by npix ratio (where npix = 12 * nside^2)
+    if p_data["nside"] != 128:
+        for key in prior_dict:
+            prior_dict[key][0] /= (p_data["nside"] // 128) ** 2
+            prior_dict[key][1] /= (p_data["nside"] // 128) ** 2
 
     # Priors for PS templates: SCDs modeled as skew normal distributions here
-    prior_dict["iso_PS"] = {"mean_exp": [-12, -9], "var_exp": 0.25, "skew_std": 3.0,
-                            "flux_lims": [0, 4e-07], "flux_log": False, "enforce_upper_flux": True}
-
+    prior_dict["iso_PS"] = {"mean_exp": [-1.5, 1.5], "var_exp": 0.2, "skew_std": 3.0,
+                            "flux_lims": [10000, 10000], "flux_log": False, "enforce_upper_flux": True}
     # Dict keys determine mean, variance, skew, total expected flux, and whether the log of flux_lims is specified.
     # If "enforce_upper_flux" is true: re-draw PS population if the sampled total flux exceeds upper prior limit
     # Note: if two template maps are summed up later, the upper flux limits should be HALF of the max. expected flux!
     p_tt["priors"] = prior_dict
-
-    # Spectrum prior settings
-    ###################################
-    priors_E_dict = DotDict()
-
-    # Poissonian templates
-    priors_E_dict["dif_silvia"] = {"mean_exp": [np.log10(2), np.log10(5)], "var_exp": 0.5, "var_gamma_shape": 1.0,
-                                   "var_gamma_scale": 1.0, "skew_std": 3.0}
-
-    # PS templates
-    priors_E_dict["iso_PS"] = {"mean_exp": [np.log10(2), np.log10(5)], "var_exp": 0.5, "skew_std": 3.0,
-                               "var_gamma_shape": 1.0, "var_gamma_scale": 1.0}
-    p_tt["priors_E"] = priors_E_dict
-
     p["tt"] = p_tt
 
     # Settings for combining template maps
     ###################################
     p_comb = DotDict()
-    p_comb["data_name"] = "Comparison_1_comb"  # name of data folder for the combined maps
+    p_comb["data_name"] = "Iso_example_debug_comb"  # name of data folder for the combined maps
     p_comb["filename_base"] = "Maps"  # name basis of combined map files
-    p_comb["N_val"] = 25  # number of files for the validation data set
-    p_comb["N_test"] = 25  # number of files for the testing data set
+    p_comb["N_val"] = 2  # number of files for the validation data set
+    p_comb["N_test"] = 2  # number of files for the testing data set
     # the remaining files will be used as training data
 
     # SCD histogram settings
@@ -191,7 +174,7 @@ def get_params(int_flag=0):
     p_comb["do_dNdF"] = True  # save histograms of dNdFs?
     p_comb["do_counts_per_PS"] = False  # save histograms of counts per PS?
     p_comb["do_counts_per_pix"] = False   # save histograms of counts per pixel (before applying the PSF)?
-    p_comb["bins_dNdF"] = np.asarray([-np.infty] + list(np.logspace(-12.5, -7.0, 21)) + [np.infty])  # bins for SCD
+    p_comb["bins_dNdF"] = np.asarray([-np.infty] + list(np.logspace(-2.5, 2.5, 10001)) + [np.infty])  # bins for SCD
     p_comb["power_of_F_dNdF"] = 1  # power of F to multiply dN/dF with.
     # Note: for log-spaced flux bins, we actually consider F dN/dlogF  ~  F^2 dN/dF
     p_comb["bins_counts_per_PS"] = np.asarray(list(np.linspace(0, 60, 21) - 0.5) + [np.infty])  # bins
@@ -202,7 +185,7 @@ def get_params(int_flag=0):
     # Neural network settings
     ###################################
     p_nn = DotDict()
-    p_nn["run_name"] = "Training_1"  # name of training run
+    p_nn["run_name"] = "Training_debug"  # name of training run
     p_nn["NN_type"] = "CNN"  # type of NN: only "CNN" implemented so far
     p_nn["remove_exp"] = True  # remove exposure correction (work in terms of FLUX vs COUNTS)
 
@@ -216,19 +199,17 @@ def get_params(int_flag=0):
     p_arch['K'] = [5] * len(p_arch['F'])  # polynomial orders for the graph convolutions
     p_arch['is_resnet'] = [False] * len(p_arch['F'])  # use ResNet blocks instead of standard graph-convolutions
     p_arch['batch_norm'] = [2] * len(p_arch['F']) + [0] * len(p_arch['M'])  # batch (1) / instance (2) normalization
-    # Note: should be specified for conv. layers and fully-connected layers, so len = len(...['F']) + len(...['M')  # TODO: BN NOT PROPERLY WORKING AT THE MOMENT
+    # Note: should be specified for conv. layers and fully-connected layers, so len = len(...['F']) + len(...['M')
     p_arch['conv'] = 'chebyshev5'  # graph convolution: "chebyshev5" or "monomials"
     p_arch['pool'] = 'max'  # pooling: 'max' or 'avg'
     p_arch['append_tot_counts'] = True  # if p_nn["rel_counts"]: append total counts to input for first FC layer?
-    p_arch["append_std"] = True  # if True: append std of counts to input for first FC layer?
     p_arch['activation'] = 'relu'  # non-linearity: relu, elu, leaky_relu, etc.
     p_nn["arch"] = p_arch
 
     # Flux fractions
     ###################################
     p_ff = DotDict()
-    p_ff["return_ff"] = True  # main switch for flux fraction estimation
-    p_ff["return_energies"] = False  # if True: return flux fraction per energy bin  # TODO!!!
+    p_ff["return_ff"] = False  # main switch for flux fraction estimation
     p_ff["alea_covar"] = False  # if True: estimate aleatoric uncertainty covariance matrix
     p_ff["alea_var"] = False  # if True: estimate aleatoric uncertainty variances, no correlations
     p_ff["rel_counts"] = True  # scale the pixel values by the total number of counts in the map?
@@ -242,12 +223,15 @@ def get_params(int_flag=0):
     p_hist["return_hist"] = True  # main switch for SCD histogram estimation
     p_hist["hist_templates"] = ["iso_PS"]  # list of PS templates with histogram
     # Note: this must be subset of the templates for which the histograms were saved, given by p_comb["hist_templates")
-    p_hist["last_act"] = "normalized_softplus"  # last activation function yielding the SCD histogram,
-    # "softmax" or "normalized_softplus"
-    p_hist["calculate_residual"] = False  # calculate FF residual and feed as an additional input to the brightness part  # TODO!
+    p_hist["last_act"] = "sigmoid"  # last activation function yielding the SCD histogram,
+    # "softmax" or "normalized_softplus" (but must be "sigmoid" if "continuous")
+    p_hist["calculate_residual"] = False  # calculate FF residual and feed as an additional input to the brightness part
     p_hist["rel_counts"] = True  # feed relative counts (and normalized residual) to histogram part of the NN?
     p_hist["which_histogram"] = "dNdF"  # "dNdF", "counts_per_PS", or "counts_per_pix"
     p_hist["log_spaced_bins"] = True  # are the bins logarithmically spaced (otherwise: linear spacing is assumed)?
+    p_hist["continuous"] = False  # TODO: IMPLEMENT: estimate (pseudo)-continuous distribution rather than histogram NOTE: requires EMPL!
+    p_hist["enforce_monotonicity"] = False  # TODO: IMPLEMENT!
+    p_hist["hist_same_tau_for_each_flux_query"] = False  # if True: use the same tau for all flux queries
     p_nn["hist"] = p_hist
 
     # Training data selection settings (can be used to bias training data fed to the NN)
@@ -268,12 +252,12 @@ def get_params(int_flag=0):
     p_train = DotDict()
     # Note: the batch sizes specified below set the GLOBAL batch size.
     # For example, setting p_train['batch_size'] = 256 yields n_batch = 64 on each GPU when using 4 GPUs.
-    p_train['num_steps'] = 30000  # number of steps to do (total number of maps shown is num_steps * batch_size)
+    p_train['num_steps'] = 10000  # number of steps to do (total number of maps shown is num_steps * batch_size)
     p_train['batch_size'] = 32  # number of samples per training batch. Should be a power of 2 for greater speed
     p_train['batch_size_val'] = 32  # number of samples per validation batch
     p_train['prefetch_batch_buffer'] = 5  # number of batches to prefetch for training data
     p_train['prefetch_batch_buffer_val'] = 5  # number of batches to prefetch for validation data
-    p_train['eval_frequency'] = 500  # frequency of model evaluations during training (influences training time!)
+    p_train['eval_frequency'] = 250  # frequency of model evaluations during training (influences training time!)
     p_train['scheduler'] = 'ExponentialDecay'  # learning rate scheduler
     p_train['scheduler_dict'] = {"initial_learning_rate": 5e-4, "decay_steps": 1, "decay_rate": 1 - 0.00015,
                                  "staircase": False}  # scheduler settings
@@ -282,18 +266,24 @@ def get_params(int_flag=0):
     p_train['ff_loss'] = 'l2'  # loss function for the flux fraction estimation
     # one of "l1" or "l2" (also includes normal max. likelihood loss for alea_covar / alea_var == True)
     p_train['hist_loss'] = 'EMPL'  # loss function for the SCD histogram estimation
-    # one of: "l1", "l2", "EM1", "EM2", "CJS" (cumulative Jensen-Shannon), "x-ent", "EMPL" (Earth Mover's Pinball Loss)
+    # one of: "l1", "l2", "EM1", "EM2", "CJS" (cumulative Jensen-Shannon), "x-ent", "EMPL" (Earth Mover's Pinball Loss),
+    # or "EMPL_continuous" for continuous EMPL
+    p_train['hist_tau_prior'] = "uniform"  # "uniform" for uniform on tau, "uniform_in_z" for uniform w.r.t. Gaussian z-vals.
+    p_train['hist_n_taus'] = 1  # how many quantile levels shall be evaluated at the same time, for each flux query?
+    p_train['hist_same_tau_for_each_flux_query'] = True  # if True: a fixed quantile level is taken for all flux queries   # TODO
+    p_train['hist_n_flux_queries'] = 1  # how many fluxes shall be queried for continuous dN/dF estimation (each with a different tau)?
     p_train['hist_pinball_smoothing'] = 0.001  # if > 0.0: take smoothed pinball loss (for example: 0.001)
-    p_train["hist_tau_prior"] = "uniform"  # prior for the quantile levels tau (for EMPL loss)
+    p_train['hist_lambda_sharpness'] = 0.5  # coefficient for sharpness term in cali_continuous loss function
     p_train['ff_train_metrics'] = ["l2", "l1", "x-ent"]  # flux fraction metrics for tensorboard
-    p_train['hist_train_metrics'] = ["l2", "l1", "x-ent"]  # SCD histogram metrics for tensorboard
+    p_train['hist_train_metrics'] = []  # SCD histogram metrics for tensorboard  TODO!
+    p_train["hist_same_tau_for_each_flux_query"] = False
     p["train"] = p_train
 
     # Plot settings
     ###################################
     p_plot = DotDict()
-    p_plot["colors_P"] = ['#37c837']  # plot colors for the Poissonian models
-    p_plot["colors_PS"] = ['deepskyblue', 'k']  # plot colors for the point-source models
+    p_plot["colors_P"] = []  # plot colors for the Poissonian models
+    p_plot["colors_PS"] = ['k']  # plot colors for the point-source models
     p["plot"] = p_plot
 
     # Debugging settings (only booleans allowed)
