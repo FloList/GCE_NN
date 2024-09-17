@@ -84,7 +84,7 @@ class Dataset(object):
         # Correct for exposure correction?
         if self._p.nn["remove_exp"]:
             def remove_exp(ds):
-                ds["data"] /= self._rescale_compressed_expanded
+                ds["data"] /= self._rescale_compressed_expanded[:, :, None]
                 return ds
 
             dataset = dataset.map(remove_exp)

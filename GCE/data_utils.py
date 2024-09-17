@@ -259,6 +259,9 @@ def get_fermi_pdf_sampler(n_points_f=int(1e6), file=None):
         psf_data = np.load(file)  # should have keys
         assert all(k in psf_data.files for k in ["psf", "energies", "theta_rad"])
         psf_values = psf_data["psf"]
+        if np.any(psf_values < 0):
+            print(f"Warning! Negative values in PSF data (minimum: {np.min(psf_values)})! Setting them to zero...")
+            psf_values[psf_values < 0] = 0.0
         psf_theta_rad = psf_data["theta_rad"]
         pdf_psf = psf_theta_rad[None, :] * psf_values
         pdf = [PDFSampler(psf_theta_rad, pdf_psf[i]) for i in range(len(psf_values))]

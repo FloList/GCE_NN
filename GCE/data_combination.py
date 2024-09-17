@@ -320,7 +320,7 @@ def combine_template_maps(save_filenames, params, job_id=None, train_range=None,
                     # Add to combined map
                     combined_map += temp_map
                     # Calculate flux
-                    flux = temp_map / np.expand_dims(exp_indices_roi, 0)
+                    flux = temp_map / exp_indices_roi[None, :, None]
                     # Total flux of template: sum over pixels
                     total_flux_dict[temp] += flux.sum(1)
 
