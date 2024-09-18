@@ -167,7 +167,7 @@ class Analysis:
                    (self.p.nn.ff["return_ff"] and self.p.nn.hist["return_hist"]), \
                     "The option 'calculate_residual' requires 'return_ff' == 'return_hist' == True!"
         if "train" in self.p.keys():
-            assert self.p.train['hist_pinball_smoothing'] > 0, "Pinball smoothing must be non-negative!"
+            assert self.p.train['hist_pinball_smoothing'] >= 0, "Pinball smoothing must be non-negative!"
         if "nn" in self.p.keys() and "train" in self.p.keys():
             assert not (self.p.nn.ff["alea_var"] and self.p.nn.ff["alea_covar"]) or self.p.train["ff_loss"] == "l2", \
                 "Flux fraction uncertainty estimation requires self.p.train['ff_loss'] = 'l2'!"
